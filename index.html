@@ -1,0 +1,1709 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>emefka.rt — Kontur- und Feldgenerator</title>
+<meta name="description" content="Browserbasierter Generator fuer geometrische Konturgrafik: Kantenfeld, Delaunay-Netz, Knoten- und Liniensysteme, Raster und Dither. Rechnet vollstaendig im Browser.">
+<meta name="color-scheme" content="dark light">
+<meta property="og:title" content="emefka.rt — Kontur- und Feldgenerator">
+<meta property="og:description" content="Bild hineinziehen, Kantenfeld auslesen, geometrische Grafik erzeugen. Laeuft lokal im Browser.">
+<meta property="og:type" content="website">
+<style>
+:root{
+  --bg:#0a0b0d;
+  --panel:#0e1013;
+  --panel-2:#121519;
+  --line:#1e232a;
+  --line-soft:#171b21;
+  --fg:#e7eaed;
+  --fg-dim:#98a1ab;
+  --fg-faint:#5d666f;
+  --acc:#ff8a3d;
+  --acc-soft:rgba(255,138,61,.16);
+  --ok:#6fd08c;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --rail:340px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:var(--sans);font-size:13px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow:hidden;
+}
+button,input,select{font:inherit;color:inherit}
+::selection{background:var(--acc);color:#120903}
+
+/* ---------- Grundgeruest ---------- */
+#app{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);grid-template-rows:auto 1fr;height:100dvh;min-width:0}
+header{
+  grid-column:1/-1;display:flex;align-items:center;gap:14px;
+  padding:0 16px;height:52px;border-bottom:1px solid var(--line);
+  background:var(--panel);position:relative;z-index:6;
+  min-width:0;overflow-x:auto;scrollbar-width:none;
+}
+header::-webkit-scrollbar{display:none}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0;flex:none}
+.brand b{font-size:15px;letter-spacing:.14em;font-weight:600}
+.brand span{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--fg-faint);white-space:nowrap}
+.headspace{flex:1}
+.hbtn{
+  display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;
+  background:transparent;border:1px solid var(--line);border-radius:2px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--fg-dim);
+  cursor:pointer;white-space:nowrap;flex:none;transition:border-color .12s,color .12s,background .12s;
+}
+.hbtn:hover{border-color:#39414b;color:var(--fg)}
+.hbtn:active{background:var(--panel-2)}
+.hbtn.prim{border-color:var(--acc);color:var(--acc)}
+.hbtn.prim:hover{background:var(--acc-soft)}
+.hbtn[disabled]{opacity:.32;cursor:not-allowed}
+#railToggle{display:none}
+
+/* ---------- Steuerspalte ---------- */
+#rail{
+  grid-row:2;min-width:0;border-right:1px solid var(--line);background:var(--panel);
+  overflow-y:auto;overscroll-behavior:contain;padding-bottom:64px;
+  scrollbar-width:thin;scrollbar-color:#262c34 transparent;
+}
+#rail::-webkit-scrollbar{width:9px}
+#rail::-webkit-scrollbar-thumb{background:#262c34;border:3px solid var(--panel);border-radius:9px}
+
+.sec{border-bottom:1px solid var(--line-soft)}
+.sec>summary{
+  display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;
+  padding:12px 14px;user-select:none;
+}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary:hover{background:#101317}
+.sec .num{font-family:var(--mono);font-size:10px;color:var(--fg-faint);letter-spacing:.08em}
+.sec .ttl{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--fg)}
+.sec .sub{font-size:11px;color:var(--fg-faint);margin-left:auto;padding-left:8px;text-align:right}
+.sec .chev{width:9px;height:9px;border-right:1px solid var(--fg-faint);border-bottom:1px solid var(--fg-faint);
+  transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s;flex:none}
+.sec[open] .chev{transform:rotate(225deg) translate(-1px,-1px)}
+.sec .body{padding:2px 14px 16px}
+
+.ctl{margin:13px 0}
+.ctl.off{opacity:.34;pointer-events:none}
+.ctl .lab{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.ctl .lab i{
+  font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.13em;color:var(--fg-dim);
+}
+.ctl .lab em{font-style:normal;font-size:11px;color:var(--fg-faint)}
+.ctl .lab b{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--acc);font-weight:500;letter-spacing:.04em}
+.note{font-size:11px;color:var(--fg-faint);line-height:1.55;margin:10px 0 2px;border-left:1px solid var(--line);padding-left:10px}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;cursor:ew-resize;display:block;
+}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:#2a313a}
+input[type=range]::-moz-range-track{height:1px;background:#2a313a}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:9px;height:9px;margin-top:-4px;border-radius:50%;
+  background:var(--fg);border:0;transition:background .12s,transform .12s;
+}
+input[type=range]:hover::-webkit-slider-thumb{background:var(--acc);transform:scale(1.25)}
+input[type=range]::-moz-range-thumb{width:9px;height:9px;border:0;border-radius:50%;background:var(--fg)}
+input[type=range]:hover::-moz-range-thumb{background:var(--acc)}
+input[type=range]:focus-visible{outline:1px solid var(--acc);outline-offset:3px}
+
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{
+  flex:1 1 auto;min-width:0;padding:6px 8px;background:#0b0d10;border:1px solid var(--line);
+  border-radius:2px;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;color:var(--fg-faint);
+  cursor:pointer;transition:all .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.seg button:hover{border-color:#39414b;color:var(--fg-dim)}
+.seg button[aria-pressed=true]{background:var(--acc-soft);border-color:var(--acc);color:var(--acc)}
+.seg.col button{flex:1 1 100%;text-align:left}
+
+.sw{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.sw .track{width:30px;height:16px;border-radius:9px;border:1px solid var(--line);background:#0b0d10;position:relative;flex:none;transition:all .15s}
+.sw .track::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--fg-faint);transition:all .15s}
+.sw[aria-pressed=true] .track{border-color:var(--acc);background:var(--acc-soft)}
+.sw[aria-pressed=true] .track::after{left:16px;background:var(--acc)}
+.sw .txt i{font-style:normal;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;color:var(--fg)}
+.sw .txt em{display:block;font-style:normal;font-size:11px;color:var(--fg-faint);line-height:1.35}
+.sw .state{margin-left:auto;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--fg-faint)}
+.sw[aria-pressed=true] .state{color:var(--acc)}
+
+input[type=text]{
+  width:100%;background:#0b0d10;border:1px solid var(--line);border-radius:2px;
+  padding:7px 9px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+}
+input[type=text]:focus{outline:none;border-color:var(--acc)}
+
+/* ---------- Buehne ---------- */
+#stage{
+  grid-row:2;position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;
+  background:
+    linear-gradient(0deg,rgba(255,255,255,.012) 1px,transparent 1px) 0 0/100% 28px,
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px) 0 0/28px 100%,
+    #070809;
+}
+#canvasWrap{flex:1;position:relative;display:grid;place-items:center;padding:24px;min-height:0}
+canvas#view{
+  max-width:100%;max-height:100%;display:block;
+  box-shadow:0 24px 70px rgba(0,0,0,.62),0 0 0 1px rgba(255,255,255,.055);
+  touch-action:none;
+}
+#drop{
+  position:absolute;inset:14px;border:1px dashed var(--acc);border-radius:3px;
+  display:none;place-items:center;background:rgba(10,11,13,.86);z-index:5;
+  font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--acc);text-align:center;
+}
+#drop.on{display:grid}
+#busy{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--acc);
+  background:rgba(10,11,13,.9);border:1px solid var(--line);padding:5px 12px;border-radius:2px;
+  opacity:0;transition:opacity .16s;pointer-events:none;z-index:4;
+}
+#busy.on{opacity:1}
+
+#statusbar{
+  border-top:1px solid var(--line);background:var(--panel);
+  display:flex;align-items:center;gap:0;height:34px;padding:0 4px;overflow-x:auto;
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--fg-faint);
+  scrollbar-width:none;
+}
+#statusbar::-webkit-scrollbar{display:none}
+#statusbar .cell{padding:0 12px;white-space:nowrap;border-right:1px solid var(--line-soft);height:100%;display:flex;align-items:center;gap:7px}
+#statusbar .cell:last-child{border-right:0}
+#statusbar .cell u{text-decoration:none;color:var(--fg-dim)}
+#statusbar .grow{flex:1;border:0}
+
+.toolrow{display:flex;gap:4px;padding:10px 14px 0;flex-wrap:wrap}
+.toolrow .hbtn{flex:1 1 auto;justify-content:center}
+
+/* ---------- Kopfzeile Datei ---------- */
+#sourceCard{
+  border:1px solid var(--line);border-radius:2px;background:#0b0d10;padding:12px;
+  display:flex;gap:11px;align-items:center;cursor:pointer;transition:border-color .12s;
+}
+#sourceCard:hover{border-color:var(--acc)}
+#sourceCard .thumb{width:52px;height:52px;flex:none;background:#000;border:1px solid var(--line);object-fit:cover}
+#sourceCard .meta{min-width:0}
+#sourceCard .meta i{font-style:normal;display:block;font-family:var(--mono);font-size:10px;letter-spacing:.11em;color:var(--fg);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sourceCard .meta em{font-style:normal;display:block;font-size:11px;color:var(--fg-faint);margin-top:3px}
+
+/* ---------- schmale Fenster ---------- */
+@media (max-width:1000px){
+  :root{--rail:300px}
+}
+@media (max-width:820px){
+  body{overflow:auto}
+  #app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}
+  header{gap:8px;padding:0 12px}
+  .hbtn{font-size:9px;padding:0 9px;letter-spacing:.08em}
+  #railToggle{display:inline-flex}
+  #stage{grid-row:2;height:58dvh}
+  #rail{grid-row:3;border-right:0;border-top:1px solid var(--line);max-height:none;overflow:visible}
+  #rail.hide{display:none}
+  #canvasWrap{padding:14px}
+  .brand span{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><b>emefka<span style="color:var(--acc)">.</span>rt</b><span>KONTUR- UND FELDGENERATOR</span></div>
+    <div class="headspace"></div>
+    <button class="hbtn" id="railToggle">REGLER</button>
+    <button class="hbtn" id="btnUndo" title="Rueckgaengig (Z)">&#8624; UNDO</button>
+    <button class="hbtn" id="btnRedo" title="Wiederherstellen (Y)">&#8625; REDO</button>
+    <button class="hbtn" id="btnCompare" title="Quelle zeigen (Taste C halten)">QUELLE</button>
+    <button class="hbtn prim" id="btnSave" title="PNG sichern (S)">PNG SICHERN &#8599;</button>
+  </header>
+
+  <aside id="rail"></aside>
+
+  <main id="stage">
+    <div id="canvasWrap">
+      <canvas id="view"></canvas>
+      <div id="drop">BILD HIER ABLEGEN</div>
+      <div id="busy">RECHNET&hellip;</div>
+    </div>
+    <div id="statusbar">
+      <div class="cell"><u id="stNodes">0</u> KNOTEN</div>
+      <div class="cell"><u id="stLinks">0</u> KANTEN</div>
+      <div class="cell"><u id="stSegs">0</u> LINIEN</div>
+      <div class="cell">FELD <u id="stField">—</u></div>
+      <div class="cell">AUSGABE <u id="stSize">—</u></div>
+      <div class="cell">SEED <u id="stSeed">—</u></div>
+      <div class="cell"><u id="stTime">—</u></div>
+      <div class="cell grow"></div>
+      <div class="cell" style="color:var(--fg-faint)">ALLES LOKAL IM BROWSER &middot; KEIN UPLOAD</div>
+    </div>
+  </main>
+</div>
+<input type="file" id="fileInput" accept="image/*" hidden>
+<script>
+"use strict";
+/* =======================================================================
+   emefka.rt — Kontur- und Feldgenerator
+   Eigenstaendige Implementierung. Keine externen Abhaengigkeiten,
+   kein Netzzugriff, keine Uebertragung von Bilddaten.
+   ======================================================================= */
+
+/* ---------------------------------------------------------------- Werkzeug */
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const TAU=Math.PI*2;
+const $=s=>document.querySelector(s);
+
+/** Deterministischer Zufall, damit jedes Ergebnis reproduzierbar bleibt. */
+function rngFrom(seed){
+  let a=(seed>>>0)||1;
+  return function(){
+    a|=0;a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+/** Stabiler Hash fuer Entscheidungen pro Element (ohne Zustand). */
+function hash3(a,b,c){
+  let h=(a*374761393+b*668265263+c*2246822519)>>>0;
+  h=Math.imul(h^h>>>13,1274126177)>>>0;
+  return ((h^h>>>16)>>>0)/4294967296;
+}
+
+/* ---------------------------------------------------------------- Paletten */
+const PALETTES={
+  quelle :{label:'SOURCE / Originalfarbe', bg:'#08090b', ink:'#f2f4f6', line:'#c9d1d9', mark:'#ff8a3d', src:true},
+  graphit:{label:'GRAPHIT / Mono',         bg:'#0a0b0d', ink:'#e9ecef', line:'#8d969f', mark:'#ffffff'},
+  amber  :{label:'AMBER / Signal',         bg:'#100a04', ink:'#ffb85c', line:'#c2762c', mark:'#fff0dd'},
+  indigo :{label:'INDIGO / Tiefe',         bg:'#07080f', ink:'#bcc6ff', line:'#6b7bd0', mark:'#ffffff'},
+  moos   :{label:'MOOS / Druck',           bg:'#070b08', ink:'#c9e6cb', line:'#6f9c78', mark:'#f4ffe9'},
+  papier :{label:'PAPIER / Hell',          bg:'#ece7dd', ink:'#191b1e', line:'#6a7079', mark:'#c0402a', light:true}
+};
+const INKS={
+  graphit:{label:'GRAPHIT',  paper:'#0b0c0e', ink:'#e9ebee'},
+  papier :{label:'PAPIER',   paper:'#ece6da', ink:'#17181a'},
+  amber  :{label:'AMBER',    paper:'#120c05', ink:'#ffa338'},
+  indigo :{label:'INDIGO',   paper:'#070a14', ink:'#93a6ff'},
+  rot    :{label:'ZINNOBER', paper:'#110607', ink:'#ff4f3d'}
+};
+const BLENDS=[
+  ['source-over','NORMAL'],['screen','SCREEN'],['multiply','MULTIPLY'],['overlay','OVERLAY'],
+  ['soft-light','SOFT LIGHT'],['hard-light','HARD LIGHT'],['difference','DIFFERENZ'],['exclusion','AUSSCHLUSS'],
+  ['lighten','HELLER'],['darken','DUNKLER'],['luminosity','LUMINANZ']
+];
+
+/* ---------------------------------------------------------------- Parameter */
+const DEFAULTS={
+  seed:4711,
+  /* Quelle + Farbe */
+  palette:'quelle', colorMode:'hybrid', sourceOpacity:20, backdrop:100,
+  /* Feld */
+  nodeDensity:1500, edgeThreshold:16, smoothing:1, fieldBias:0,
+  /* Knoten */
+  nodesOn:true, shape:'mixed', minShape:1.6, maxShape:13, hierarchy:62,
+  shapeJitter:34, shapeStroke:1, shapeFill:10, alignTangent:true,
+  /* Verbindungen */
+  linksOn:true, linkMode:'delaunay', maxDistance:52, linkKeep:58, linkWeight:.6, linkFade:70,
+  /* Konturen */
+  contourOn:true, contourMode:'topo', contourLevels:11, lineDetail:58,
+  contourOpacity:38, flowLength:62, flowSpeed:0,
+  /* Raster */
+  gridOn:false, gridProgram:'editorial', gridModules:6, gridVariation:48,
+  gridAdherence:62, gridGutter:12, gridNegative:34, gridOpacity:52,
+  /* Dither */
+  ditherOn:false, ditherAlgo:'atkinson', ditherPitch:6, ditherThreshold:50,
+  ditherContrast:52, ditherEdge:38, ditherInk:'graphit', ditherInvert:false,
+  ditherOpacity:78, ditherBlend:'source-over',
+  /* Oberflaeche */
+  scanOn:true, scanSpacing:3, scanOpacity:11, grain:13, vignette:32,
+  /* Beschriftung */
+  labelsOn:false, labelCount:14, frameOn:true, title:'KONTUR A-01'
+};
+let P=Object.assign({},DEFAULTS);
+
+/* ---------------------------------------------------------------- Schema
+   Die gesamte Steuerspalte wird aus dieser Liste erzeugt.                */
+const opt=(v,l)=>({v,l});
+const SCHEMA=[
+ {num:'01',ttl:'SOURCE',sub:'Quelle',open:true,ctrls:[
+   {t:'source'},
+   {t:'note',de:'Bild hineinziehen oder Feld anklicken. JPG, PNG, WEBP, GIF, AVIF. Die Datei wird nur im Arbeitsspeicher dieses Browsers gelesen — nichts wird hochgeladen.'},
+   {t:'seg',k:'palette',lab:'PALETTE',de:'Farbraum der Grafik',col:true,
+     opts:Object.keys(PALETTES).map(k=>opt(k,PALETTES[k].label))},
+   {t:'seg',k:'colorMode',lab:'COLOR MODE',de:'Herkunft der Linienfarbe',
+     opts:[opt('flat','FLAECHIG'),opt('source','AUS BILD'),opt('hybrid','HYBRID'),opt('duotone','DUOTON')]},
+   {t:'rng',k:'sourceOpacity',lab:'SOURCE OPACITY',de:'Sichtbarkeit des Originals',min:0,max:100,step:1,unit:'%'},
+   {t:'rng',k:'backdrop',lab:'BACKDROP',de:'Deckkraft des Hintergrunds',min:0,max:100,step:1,unit:'%'}
+ ]},
+ {num:'02',ttl:'FIELD EXTRACTION',sub:'Kantenfeld',open:true,ctrls:[
+   {t:'note',de:'Sobel-Operator in X und Y → Gradientenbetrag und -richtung → Unterdrueckung aller Nicht-Maxima quer zur Kante → raeumliche Auswahl der staerksten Punkte. Jeder Knoten kennt danach seine Tangentenrichtung.'},
+   {t:'rng',k:'nodeDensity',lab:'NODE DENSITY',de:'Angestrebte Knotenzahl',min:120,max:6000,step:20},
+   {t:'rng',k:'edgeThreshold',lab:'EDGE THRESHOLD',de:'Mindeststaerke einer Kante',min:2,max:70,step:1,unit:'%'},
+   {t:'rng',k:'smoothing',lab:'PRE-SMOOTHING',de:'Glaettung vor der Ableitung',min:0,max:5,step:1,unit:'px'},
+   {t:'rng',k:'fieldBias',lab:'CURVATURE BIAS',de:'Kruemmung bevorzugen statt Kontrast',min:0,max:100,step:1,unit:'%'}
+ ]},
+ {num:'03',ttl:'SHAPE SYSTEM',sub:'Knotenzeichen',open:true,ctrls:[
+   {t:'sw',k:'nodesOn',lab:'GEOMETRY NODES',de:'Zeichen auf den Kantenpunkten'},
+   {t:'seg',k:'shape',lab:'SHAPE',de:'Grundform',dep:'nodesOn',
+     opts:[opt('circle','○ KREIS'),opt('square','□ QUADRAT'),opt('diamond','◇ RAUTE'),
+           opt('cross','＋ KREUZ'),opt('bracket','⌈⌋ KLAMMER'),opt('tick','│ STRICH'),opt('mixed','○□ GEMISCHT')]},
+   {t:'rng',k:'minShape',lab:'MIN SHAPE',de:'Kleinstes Zeichen',min:.5,max:10,step:.1,unit:'px',dep:'nodesOn'},
+   {t:'rng',k:'maxShape',lab:'MAX SHAPE',de:'Groesstes Zeichen',min:2,max:60,step:.5,unit:'px',dep:'nodesOn'},
+   {t:'rng',k:'hierarchy',lab:'SIZE HIERARCHY',de:'Spreizung klein zu gross',min:0,max:100,step:1,unit:'%',dep:'nodesOn'},
+   {t:'rng',k:'shapeJitter',lab:'SEED VARIATION',de:'Streuung je Zeichen',min:0,max:100,step:1,unit:'%',dep:'nodesOn'},
+   {t:'rng',k:'shapeStroke',lab:'SHAPE STROKE',de:'Strichstaerke',min:.2,max:4,step:.1,unit:'px',dep:'nodesOn'},
+   {t:'rng',k:'shapeFill',lab:'SHAPE FILL',de:'Fuellung der Zeichen',min:0,max:100,step:1,unit:'%',dep:'nodesOn'},
+   {t:'sw',k:'alignTangent',lab:'TANGENT ALIGN',de:'Zeichen entlang der Kante drehen',dep:'nodesOn'}
+ ]},
+ {num:'04',ttl:'CONNECTIONS',sub:'Liniennetz',open:true,ctrls:[
+   {t:'sw',k:'linksOn',lab:'EDGE LINK GRAPH',de:'Knoten miteinander verbinden'},
+   {t:'seg',k:'linkMode',lab:'LINK SYSTEM',de:'Verknuepfungsverfahren',col:true,dep:'linksOn',
+     opts:[opt('proximity','PROXIMITY / Nachbarschaft'),opt('delaunay','DELAUNAY / Dreiecksnetz'),
+           opt('chain','EDGE CHAIN / Konturzug'),opt('radial','RADIAL / Strahlen'),
+           opt('ortho','ORTHOGONAL / Achsen'),opt('hybrid','HYBRID / Mischung')]},
+   {t:'rng',k:'maxDistance',lab:'MAX DISTANCE',de:'Groesste Spannweite',min:6,max:240,step:2,unit:'px',dep:'linksOn'},
+   {t:'rng',k:'linkKeep',lab:'LINE CONFIDENCE',de:'Anteil behaltener Kanten',min:2,max:100,step:1,unit:'%',dep:'linksOn'},
+   {t:'rng',k:'linkWeight',lab:'LINE WEIGHT',de:'Strichstaerke',min:.1,max:3,step:.05,unit:'px',dep:'linksOn'},
+   {t:'rng',k:'linkFade',lab:'LENGTH FADE',de:'Lange Kanten ausblenden',min:0,max:100,step:1,unit:'%',dep:'linksOn'}
+ ]},
+ {num:'05',ttl:'CONTOUR FIELD',sub:'Hoehenlinien',open:true,ctrls:[
+   {t:'sw',k:'contourOn',lab:'SOURCE CONTOURS',de:'Linien entlang von Licht und Kante'},
+   {t:'seg',k:'contourMode',lab:'DRAWING METHOD',de:'Linienart',col:true,dep:'contourOn',
+     opts:[opt('topo','TOPOGRAPHIC / Helligkeits-Hoehenlinien'),opt('flow','FLOW ENGRAVING / Stromlinien')]},
+   {t:'rng',k:'contourLevels',lab:'CONTOUR LEVELS',de:'Zahl der Hoehenstufen',min:2,max:40,step:1,dep:'contourOn'},
+   {t:'rng',k:'lineDetail',lab:'LINE DETAIL',de:'Aufloesung der Linien',min:5,max:100,step:1,unit:'%',dep:'contourOn'},
+   {t:'rng',k:'contourOpacity',lab:'CONTOUR OPACITY',de:'Deckkraft',min:0,max:100,step:1,unit:'%',dep:'contourOn'},
+   {t:'rng',k:'flowLength',lab:'FLOW LENGTH',de:'Laenge der Stromlinien',min:5,max:100,step:1,unit:'%',dep:'contourOn'},
+   {t:'rng',k:'flowSpeed',lab:'FLOW SPEED',de:'0 = stehendes Bild, sonst Bewegung',min:0,max:100,step:1,unit:'%',dep:'contourOn'},
+   {t:'note',de:'TOPOGRAPHIC legt Hoehenlinien durch gleiche Helligkeitswerte. FLOW ENGRAVING laesst Linien quer zum Gradienten laufen, also den Kanten folgend. Bei Geschwindigkeit 0 steht das Bild vollstaendig still.'}
+ ]},
+ {num:'06',ttl:'GRID SYSTEM',sub:'Raster',ctrls:[
+   {t:'sw',k:'gridOn',lab:'GRID SYSTEM',de:'Konstruktives Raster einblenden'},
+   {t:'seg',k:'gridProgram',lab:'GRID PROGRAM',de:'Aufteilungsregel',col:true,dep:'gridOn',
+     opts:[opt('measure','MESSRASTER / gleichmaessig'),opt('editorial','EDITORIAL / grosse Leere'),
+           opt('fragment','FRAGMENT / Bildausschnitte'),opt('data','DATENINDEX / beschriftet')]},
+   {t:'rng',k:'gridModules',lab:'MODULE COUNT',de:'Grundteilung',min:2,max:16,step:1,dep:'gridOn'},
+   {t:'rng',k:'gridVariation',lab:'CELL VARIATION',de:'Ungleichheit der Zellen',min:0,max:100,step:1,unit:'%',dep:'gridOn'},
+   {t:'rng',k:'gridAdherence',lab:'SOURCE ADHERENCE',de:'Bindung an die Bilddichte',min:0,max:100,step:1,unit:'%',dep:'gridOn'},
+   {t:'rng',k:'gridGutter',lab:'GUTTER @1080',de:'Abstand der Zellen',min:0,max:60,step:1,unit:'px',dep:'gridOn'},
+   {t:'rng',k:'gridNegative',lab:'NEGATIVE SPACE',de:'Anteil leerer Zellen',min:0,max:90,step:1,unit:'%',dep:'gridOn'},
+   {t:'rng',k:'gridOpacity',lab:'GRID OPACITY',de:'Deckkraft',min:0,max:100,step:1,unit:'%',dep:'gridOn'},
+   {t:'note',de:'Die Zellen entstehen durch rekursive Teilung: wo das Bild viele Kantenpunkte traegt, wird feiner geteilt, ruhige Flaechen bleiben gross. FRAGMENT holt in einzelne Zellen den Originalausschnitt zurueck.'}
+ ]},
+ {num:'07',ttl:'DITHER PRINT',sub:'Rasterdruck',ctrls:[
+   {t:'sw',k:'ditherOn',lab:'DITHER PRINT',de:'Bild in ein 1-Bit-Druckbild wandeln'},
+   {t:'seg',k:'ditherAlgo',lab:'ALGORITHM',de:'Fehlerverteilung',col:true,dep:'ditherOn',
+     opts:[opt('atkinson','ATKINSON / offenes Korn'),opt('floyd','FLOYD–STEINBERG / dicht'),
+           opt('bayer','BAYER 4×4 / geordnet'),opt('noise','RAUSCHEN / stochastisch')]},
+   {t:'rng',k:'ditherPitch',lab:'GRAIN PITCH @1080',de:'Korngroesse bei 1080px',min:1,max:32,step:1,unit:'px',dep:'ditherOn'},
+   {t:'rng',k:'ditherThreshold',lab:'THRESHOLD',de:'Schwelle hell zu dunkel',min:5,max:95,step:1,unit:'%',dep:'ditherOn'},
+   {t:'rng',k:'ditherContrast',lab:'CONTRAST',de:'Spreizung der Tonwerte',min:0,max:100,step:1,unit:'%',dep:'ditherOn'},
+   {t:'rng',k:'ditherEdge',lab:'EDGE PRESERVE',de:'Kanten vor dem Korn schuetzen',min:0,max:100,step:1,unit:'%',dep:'ditherOn'},
+   {t:'seg',k:'ditherInk',lab:'INK / PAPER',de:'Zweifarbigkeit',dep:'ditherOn',
+     opts:Object.keys(INKS).map(k=>opt(k,INKS[k].label))},
+   {t:'sw',k:'ditherInvert',lab:'INVERT PRINT',de:'Papier und Farbe tauschen',dep:'ditherOn'},
+   {t:'rng',k:'ditherOpacity',lab:'DITHER OPACITY',de:'Deckkraft',min:0,max:100,step:1,unit:'%',dep:'ditherOn'},
+   {t:'seg',k:'ditherBlend',lab:'BLEND',de:'Mischverfahren',col:false,dep:'ditherOn',
+     opts:BLENDS.map(b=>opt(b[0],b[1]))},
+   {t:'note',de:'Die Korngroesse ist in echten Pixeln bei 1080px kurzer Kante angegeben und wird beim Export mitskaliert. 1px ergibt feinen Druck, 32px grobes Plakatkorn.'}
+ ]},
+ {num:'08',ttl:'SURFACE',sub:'Oberflaeche',ctrls:[
+   {t:'sw',k:'scanOn',lab:'SCANLINE FIELD',de:'Abtastzeilen ueber der Flaeche'},
+   {t:'rng',k:'scanSpacing',lab:'LINE PITCH',de:'Zeilenabstand',min:2,max:24,step:1,unit:'px',dep:'scanOn'},
+   {t:'rng',k:'scanOpacity',lab:'SCAN OPACITY',de:'Deckkraft der Zeilen',min:0,max:60,step:1,unit:'%',dep:'scanOn'},
+   {t:'rng',k:'grain',lab:'GRAIN',de:'Filmkorn',min:0,max:60,step:1,unit:'%'},
+   {t:'rng',k:'vignette',lab:'VIGNETTE',de:'Abdunklung zum Rand',min:0,max:100,step:1,unit:'%'}
+ ]},
+ {num:'09',ttl:'ANNOTATION',sub:'Beschriftung',ctrls:[
+   {t:'sw',k:'labelsOn',lab:'NODE LABELS',de:'Koordinaten an starken Knoten'},
+   {t:'rng',k:'labelCount',lab:'LABEL COUNT',de:'Zahl der Beschriftungen',min:1,max:60,step:1,dep:'labelsOn'},
+   {t:'sw',k:'frameOn',lab:'ARTWORK FRAME',de:'Ecken, Titel und Erzeugungsdaten'},
+   {t:'txt',k:'title',lab:'TITLE',de:'Freier Text im Rahmen',dep:'frameOn'}
+ ]},
+ {num:'10',ttl:'LOOKS + SEED',sub:'Voreinstellungen',open:true,ctrls:[
+   {t:'looks'},
+   {t:'rng',k:'seed',lab:'SEED',de:'Zufallsgrundlage — gleicher Seed, gleiches Bild',min:1,max:9999,step:1},
+   {t:'tools'},
+   {t:'note',de:'Tasten: R neuer Seed · S sichern · C gedrueckt halten zeigt die Quelle · Z zurueck · Y vor.'}
+ ]}
+];
+
+/* ================================================================ Oberflaeche */
+const UI={rng:{},seg:{},sw:{},txt:{},ctl:[]};
+
+function buildRail(){
+  const rail=$('#rail'); rail.innerHTML='';
+  for(const sec of SCHEMA){
+    const d=document.createElement('details');
+    d.className='sec'; if(sec.open) d.open=true;
+    const s=document.createElement('summary');
+    s.innerHTML='<span class="num">'+sec.num+'</span><span class="ttl">'+sec.ttl+
+      '</span><span class="sub">'+sec.sub+'</span><span class="chev"></span>';
+    d.appendChild(s);
+    const b=document.createElement('div'); b.className='body';
+    for(const c of sec.ctrls) b.appendChild(makeControl(c));
+    d.appendChild(b); rail.appendChild(d);
+  }
+  syncUI();
+}
+
+function makeControl(c){
+  if(c.t==='note'){ const n=document.createElement('p'); n.className='note'; n.textContent=c.de; return n; }
+  if(c.t==='source') return makeSourceCard();
+  if(c.t==='looks')  return makeLooks();
+  if(c.t==='tools')  return makeTools();
+
+  const w=document.createElement('div'); w.className='ctl';
+  if(c.dep) UI.ctl.push({el:w,dep:c.dep});
+
+  if(c.t==='sw'){
+    const btn=document.createElement('button');
+    btn.className='sw'; btn.type='button';
+    btn.innerHTML='<span class="track"></span><span class="txt"><i>'+c.lab+'</i><em>'+c.de+
+      '</em></span><span class="state">OFF</span>';
+    btn.addEventListener('click',()=>setParam(c.k,!P[c.k]));
+    UI.sw[c.k]=btn; w.appendChild(btn); return w;
+  }
+
+  const lab=document.createElement('div'); lab.className='lab';
+  lab.innerHTML='<i>'+c.lab+'</i><em>'+(c.de||'')+'</em><b></b>';
+  w.appendChild(lab);
+
+  if(c.t==='rng'){
+    const r=document.createElement('input');
+    r.type='range'; r.min=c.min; r.max=c.max; r.step=c.step;
+    r.addEventListener('input',()=>setParam(c.k,parseFloat(r.value),false));
+    r.addEventListener('change',()=>commit());
+    UI.rng[c.k]={el:r,out:lab.querySelector('b'),unit:c.unit||'',step:c.step};
+    w.appendChild(r); return w;
+  }
+  if(c.t==='seg'){
+    lab.querySelector('b').remove();
+    const g=document.createElement('div'); g.className='seg'+(c.col?' col':'');
+    const map={};
+    for(const o of c.opts){
+      const btn=document.createElement('button'); btn.type='button'; btn.textContent=o.l;
+      btn.addEventListener('click',()=>setParam(c.k,o.v));
+      map[o.v]=btn; g.appendChild(btn);
+    }
+    UI.seg[c.k]=map; w.appendChild(g); return w;
+  }
+  if(c.t==='txt'){
+    lab.querySelector('b').remove();
+    const i=document.createElement('input'); i.type='text'; i.maxLength=40;
+    i.addEventListener('input',()=>setParam(c.k,i.value,false));
+    i.addEventListener('change',()=>commit());
+    UI.txt[c.k]=i; w.appendChild(i); return w;
+  }
+  return w;
+}
+
+function makeSourceCard(){
+  const w=document.createElement('div'); w.className='ctl';
+  const card=document.createElement('div'); card.id='sourceCard';
+  card.innerHTML='<canvas class="thumb" id="thumb" width="52" height="52"></canvas>'+
+    '<div class="meta"><i id="srcName">EINGEBAUTE QUELLE</i><em id="srcInfo">wird erzeugt…</em></div>';
+  card.addEventListener('click',()=>$('#fileInput').click());
+  w.appendChild(card); return w;
+}
+
+const LOOKS={
+ 'KONTURATLAS':{palette:'quelle',colorMode:'hybrid',sourceOpacity:18,nodeDensity:1500,edgeThreshold:15,
+   nodesOn:true,shape:'mixed',maxShape:13,linksOn:true,linkMode:'delaunay',linkKeep:44,
+   contourOn:true,contourMode:'topo',contourLevels:13,contourOpacity:40,gridOn:false,ditherOn:false,scanOn:true},
+ 'STROMLINIEN':{palette:'graphit',colorMode:'flat',sourceOpacity:8,nodeDensity:700,edgeThreshold:18,
+   nodesOn:true,shape:'tick',maxShape:7,linksOn:false,contourOn:true,contourMode:'flow',
+   flowLength:78,lineDetail:70,contourOpacity:58,gridOn:false,ditherOn:false,scanOn:false,vignette:44},
+ 'DELAUNAY-PORTRAeT':{palette:'quelle',colorMode:'source',sourceOpacity:26,nodeDensity:2400,edgeThreshold:11,
+   nodesOn:true,shape:'circle',minShape:1,maxShape:6,linksOn:true,linkMode:'delaunay',linkKeep:82,
+   linkWeight:.4,contourOn:false,gridOn:false,ditherOn:false,scanOn:true,scanOpacity:8},
+ 'ACHSENBAU':{palette:'amber',colorMode:'flat',sourceOpacity:10,nodeDensity:1100,edgeThreshold:20,
+   nodesOn:true,shape:'bracket',maxShape:18,linksOn:true,linkMode:'ortho',maxDistance:120,linkKeep:70,
+   contourOn:false,gridOn:true,gridProgram:'measure',gridModules:9,gridOpacity:40,ditherOn:false,scanOn:true},
+ 'EDITORIALRASTER':{palette:'quelle',colorMode:'hybrid',sourceOpacity:14,nodeDensity:900,edgeThreshold:19,
+   nodesOn:true,shape:'square',maxShape:10,linksOn:true,linkMode:'chain',linkKeep:66,
+   contourOn:false,gridOn:true,gridProgram:'editorial',gridModules:5,gridNegative:46,gridOpacity:62,
+   ditherOn:false,scanOn:true,frameOn:true},
+ 'FRAGMENTFELD':{palette:'quelle',colorMode:'source',sourceOpacity:0,nodeDensity:1300,edgeThreshold:14,
+   nodesOn:true,shape:'diamond',maxShape:9,linksOn:true,linkMode:'proximity',maxDistance:44,linkKeep:40,
+   contourOn:false,gridOn:true,gridProgram:'fragment',gridModules:6,gridAdherence:78,gridNegative:22,
+   gridOpacity:88,ditherOn:false,scanOn:false},
+ 'DRUCKBOGEN':{palette:'papier',colorMode:'flat',sourceOpacity:0,nodeDensity:800,edgeThreshold:22,
+   nodesOn:true,shape:'cross',maxShape:9,shapeStroke:.8,linksOn:false,contourOn:true,contourMode:'topo',
+   contourLevels:7,contourOpacity:52,gridOn:false,ditherOn:true,ditherAlgo:'atkinson',ditherPitch:5,
+   ditherInk:'papier',ditherOpacity:100,ditherBlend:'source-over',scanOn:false,grain:6,vignette:0},
+ 'ZINNOBERDRUCK':{palette:'graphit',colorMode:'flat',sourceOpacity:0,nodeDensity:600,edgeThreshold:24,
+   nodesOn:true,shape:'tick',maxShape:8,linksOn:true,linkMode:'radial',linkKeep:34,linkWeight:.4,
+   contourOn:false,gridOn:false,ditherOn:true,ditherAlgo:'bayer',ditherPitch:9,ditherInk:'rot',
+   ditherOpacity:100,scanOn:false,grain:10},
+ 'NACHTSCHRAFFUR':{palette:'indigo',colorMode:'flat',sourceOpacity:6,nodeDensity:2000,edgeThreshold:13,
+   nodesOn:true,shape:'circle',minShape:.8,maxShape:5,linksOn:true,linkMode:'hybrid',linkKeep:50,
+   contourOn:true,contourMode:'flow',flowLength:50,contourOpacity:30,gridOn:false,
+   ditherOn:true,ditherAlgo:'noise',ditherPitch:3,ditherInk:'indigo',ditherOpacity:44,
+   ditherBlend:'screen',scanOn:true,scanOpacity:14,vignette:50},
+ 'MESSPROTOKOLL':{palette:'moos',colorMode:'flat',sourceOpacity:12,nodeDensity:700,edgeThreshold:21,
+   nodesOn:true,shape:'cross',maxShape:12,linksOn:true,linkMode:'ortho',maxDistance:150,linkKeep:58,
+   contourOn:false,gridOn:true,gridProgram:'data',gridModules:7,gridOpacity:70,ditherOn:false,
+   scanOn:true,labelsOn:true,labelCount:22,frameOn:true}
+};
+
+function makeLooks(){
+  const w=document.createElement('div'); w.className='ctl';
+  w.innerHTML='<div class="lab"><i>LOOK PRESET</i><em>'+Object.keys(LOOKS).length+' Voreinstellungen</em></div>';
+  const g=document.createElement('div'); g.className='seg col';
+  for(const name of Object.keys(LOOKS)){
+    const b=document.createElement('button'); b.type='button'; b.textContent=name;
+    b.addEventListener('click',()=>applyLook(name));
+    g.appendChild(b);
+  }
+  w.appendChild(g); return w;
+}
+
+function makeTools(){
+  const w=document.createElement('div'); w.className='ctl';
+  const g=document.createElement('div'); g.className='seg';
+  const mk=(t,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=t;
+    b.addEventListener('click',fn);g.appendChild(b);};
+  mk('NEUER SEED',()=>{setParam('seed',1+Math.floor(Math.random()*9999));});
+  mk('ALLES ZUFAELLIG',randomizeAll);
+  mk('ZURUECKSETZEN',()=>{P=Object.assign({},DEFAULTS);commit();invalidate('field');syncUI();});
+  w.appendChild(g); return w;
+}
+
+function applyLook(name){
+  Object.assign(P,DEFAULTS,LOOKS[name],{seed:P.seed,title:P.title});
+  commit(); invalidate('field'); syncUI();
+}
+
+function randomizeAll(){
+  const r=rngFrom((Math.random()*1e9)|0);
+  const pick=a=>a[Math.floor(r()*a.length)];
+  const names=Object.keys(LOOKS);
+  Object.assign(P,DEFAULTS,LOOKS[pick(names)]);
+  P.seed=1+Math.floor(r()*9999);
+  P.nodeDensity=Math.round(lerp(400,3000,r()));
+  P.edgeThreshold=Math.round(lerp(8,32,r()));
+  P.palette=pick(Object.keys(PALETTES));
+  P.shape=pick(['circle','square','diamond','cross','bracket','tick','mixed']);
+  P.linkMode=pick(['proximity','delaunay','chain','radial','ortho','hybrid']);
+  P.hierarchy=Math.round(r()*100); P.shapeJitter=Math.round(r()*100);
+  P.maxShape=Math.round(lerp(5,26,r())); P.contourOpacity=Math.round(lerp(10,70,r()));
+  commit(); invalidate('field'); syncUI();
+}
+
+/* -------- Parameter setzen, Zustand spiegeln -------- */
+const FIELD_KEYS=new Set(['nodeDensity','edgeThreshold','smoothing','fieldBias']);
+const GEOM_KEYS=new Set(['seed','shape','minShape','maxShape','hierarchy','shapeJitter','alignTangent',
+  'linksOn','linkMode','maxDistance','linkKeep','linkFade','contourOn','contourMode','contourLevels',
+  'lineDetail','flowLength','gridOn','gridProgram','gridModules','gridVariation','gridAdherence',
+  'gridGutter','gridNegative','nodesOn','labelsOn','labelCount']);
+
+function setParam(k,v,doCommit){
+  if(P[k]===v) return;
+  P[k]=v;
+  invalidate(FIELD_KEYS.has(k)?'field':GEOM_KEYS.has(k)?'geom':'paint');
+  syncUI();
+  if(doCommit!==false) commit();
+}
+
+function syncUI(){
+  for(const k in UI.rng){
+    const r=UI.rng[k]; if(r.el.value!=P[k]) r.el.value=P[k];
+    const dec=r.step<1?(String(r.step).split('.')[1]||'').length:0;
+    r.out.textContent=Number(P[k]).toFixed(dec)+(r.unit?' '+r.unit:'');
+  }
+  for(const k in UI.seg){ const m=UI.seg[k];
+    for(const v in m) m[v].setAttribute('aria-pressed',String(P[k]===v)); }
+  for(const k in UI.sw){ const b=UI.sw[k]; const on=!!P[k];
+    b.setAttribute('aria-pressed',String(on));
+    b.querySelector('.state').textContent=on?'ON':'OFF'; }
+  for(const k in UI.txt){ if(UI.txt[k].value!==P[k]) UI.txt[k].value=P[k]; }
+  for(const c of UI.ctl) c.el.classList.toggle('off',!P[c.dep]);
+  $('#stSeed').textContent=P.seed;
+}
+
+/* ================================================================ Analyse */
+const AN_MAX=1000;                       /* Kantenanalyse auf max. 1000px lange Kante */
+let SRC=null;                            /* {canvas,w,h,name} */
+let FIELD=null;                          /* Ergebnis der Kantenanalyse */
+let GEO=null;                            /* abgeleitete Geometrie */
+let BAKE=0;                              /* Zaehler der Neuberechnungen */
+
+function boxBlur(src,w,h,r){
+  if(r<=0) return src;
+  const tmp=new Float32Array(w*h), out=new Float32Array(w*h), d=r*2+1;
+  for(let y=0;y<h;y++){
+    let acc=0;
+    for(let x=-r;x<=r;x++) acc+=src[y*w+clamp(x,0,w-1)];
+    for(let x=0;x<w;x++){
+      tmp[y*w+x]=acc/d;
+      acc+=src[y*w+clamp(x+r+1,0,w-1)]-src[y*w+clamp(x-r,0,w-1)];
+    }
+  }
+  for(let x=0;x<w;x++){
+    let acc=0;
+    for(let y=-r;y<=r;y++) acc+=tmp[clamp(y,0,h-1)*w+x];
+    for(let y=0;y<h;y++){
+      out[y*w+x]=acc/d;
+      acc+=tmp[clamp(y+r+1,0,h-1)*w+x]-tmp[clamp(y-r,0,h-1)*w+x];
+    }
+  }
+  return out;
+}
+
+/** Sobel-Kantenfeld, Nicht-Maxima-Unterdrueckung, raeumliche Knotenauswahl. */
+function analyze(){
+  const t0=performance.now();
+  const sc=Math.min(1,AN_MAX/Math.max(SRC.w,SRC.h));
+  const w=Math.max(8,Math.round(SRC.w*sc)), h=Math.max(8,Math.round(SRC.h*sc));
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const cx=c.getContext('2d',{willReadFrequently:true});
+  cx.drawImage(SRC.canvas,0,0,w,h);
+  const rgba=cx.getImageData(0,0,w,h).data;
+
+  const n=w*h, lum=new Float32Array(n);
+  for(let i=0,j=0;i<n;i++,j+=4)
+    lum[i]=0.2126*rgba[j]+0.7152*rgba[j+1]+0.0722*rgba[j+2];
+  const sm=boxBlur(lum,w,h,Math.round(P.smoothing));
+
+  const mag=new Float32Array(n), ang=new Float32Array(n);
+  let maxMag=1e-6;
+  for(let y=1;y<h-1;y++){
+    for(let x=1;x<w-1;x++){
+      const i=y*w+x, a=sm[i-w-1],b=sm[i-w],cc=sm[i-w+1],
+            d=sm[i-1],f=sm[i+1],g=sm[i+w-1],hh=sm[i+w],k=sm[i+w+1];
+      const gx=(cc+2*f+k)-(a+2*d+g);
+      const gy=(g+2*hh+k)-(a+2*b+cc);
+      const m=Math.sqrt(gx*gx+gy*gy);
+      mag[i]=m; ang[i]=Math.atan2(gy,gx);
+      if(m>maxMag) maxMag=m;
+    }
+  }
+
+  /* Bezugswert robust waehlen: das 99,5. Perzentil statt des Maximums. Sonst
+     druecken einzelne sehr harte Kanten alle uebrigen unter die Schwelle. */
+  const HB=512, hist=new Int32Array(HB);
+  let tot=0;
+  for(let i=0;i<n;i++){ const v=mag[i]; if(v>0){ hist[Math.min(HB-1,(v/maxMag*HB)|0)]++; tot++; } }
+  const quant=q=>{ let acc=0, lim=tot*q;
+    for(let i=0;i<HB;i++){ acc+=hist[i]; if(acc>=lim) return (i+0.5)/HB*maxMag; }
+    return maxMag; };
+  const ref=Math.max(quant(0.995),maxMag*0.02), med=Math.max(quant(0.5),ref*0.01);
+
+  /* Nicht-Maxima quer zur Kante verwerfen, damit nur Kammlinien bleiben. */
+  const thr=ref*(P.edgeThreshold/100);
+  const cand=[];
+  for(let y=2;y<h-2;y++){
+    for(let x=2;x<w-2;x++){
+      const i=y*w+x, m=mag[i];
+      if(m<thr) continue;
+      const a=ang[i], ux=Math.cos(a), uy=Math.sin(a);
+      const m1=sampleF(mag,w,h,x+ux,y+uy), m2=sampleF(mag,w,h,x-ux,y-uy);
+      if(m<m1||m<m2) continue;
+      /* Kruemmung: Richtungsaenderung entlang der Tangente */
+      const tx=-uy, ty=ux;
+      const a1=sampleA(ang,w,h,x+tx*3,y+ty*3), a2=sampleA(ang,w,h,x-tx*3,y-ty*3);
+      let da=Math.abs(a1-a2); if(da>Math.PI) da=TAU-da;
+      cand.push({x,y,m:clamp(m/ref,0,1),a:Math.atan2(ty,tx),k:clamp(da/Math.PI,0,1),i});
+    }
+  }
+
+  const bias=P.fieldBias/100;
+  for(const p of cand) p.score=p.m*(1-bias)+p.k*bias*(0.35+0.65*p.m);
+  cand.sort((A,B)=>B.score-A.score);
+  if(cand.length>260000) cand.length=260000;
+
+  /* Raeumliche Auswahl mit Mindestabstand. Die Kandidaten liegen nach der
+     Nicht-Maxima-Unterdrueckung auf Linien, nicht in der Flaeche — der
+     Abstand folgt daher der Kurvenlaenge und wird nachgeregelt. */
+  const target=Math.round(P.nodeDensity);
+  const select=sp=>{
+    const gw=Math.ceil(w/sp)+1, gh=Math.ceil(h/sp)+1, cell=new Int32Array(gw*gh).fill(-1);
+    const out=[];
+    outer:
+    for(const p of cand){
+      const gx=Math.min(gw-1,(p.x/sp)|0), gy=Math.min(gh-1,(p.y/sp)|0);
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const X=gx+dx,Y=gy+dy; if(X<0||Y<0||X>=gw||Y>=gh) continue;
+        const id=cell[Y*gw+X]; if(id<0) continue;
+        const q=out[id], ddx=q.x-p.x, ddy=q.y-p.y;
+        if(ddx*ddx+ddy*ddy<sp*sp) continue outer;
+      }
+      cell[gy*gw+gx]=out.length;
+      const j=p.i*4;
+      out.push({x:p.x,y:p.y,nx:p.x/w,ny:p.y/h,m:p.m,k:p.k,a:p.a,s:p.score,
+        r:rgba[j],g:rgba[j+1],b:rgba[j+2]});
+      if(out.length>=target) break;
+    }
+    return out;
+  };
+  let sp=clamp(cand.length/Math.max(1,target),1.05,60);
+  let nodes=select(sp);
+  for(let it=0;it<7&&nodes.length<target*0.96&&sp>1.06;it++){
+    sp=Math.max(1.05,sp*clamp(nodes.length/target,0.28,0.94));
+    nodes=select(sp);
+  }
+
+  FIELD={w,h,lum:sm,mag,ang,maxMag,ref,med,nodes,rgba,ms:performance.now()-t0};
+  $('#stField').textContent=w+'×'+h;
+}
+function sampleF(arr,w,h,x,y){
+  const X=clamp(Math.round(x),0,w-1), Y=clamp(Math.round(y),0,h-1);
+  return arr[Y*w+X];
+}
+function sampleA(arr,w,h,x,y){ return sampleF(arr,w,h,x,y); }
+
+/* ================================================================ Geometrie */
+
+/** Bowyer-Watson: inkrementelle Delaunay-Triangulierung ohne Fremdcode. */
+function triangulate(pts){
+  const n=pts.length; if(n<3) return [];
+  let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  for(const p of pts){ if(p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x;
+                       if(p.y<miny)miny=p.y; if(p.y>maxy)maxy=p.y; }
+  const dmax=Math.max(maxx-minx,maxy-miny)||1, mx=(minx+maxx)/2, my=(miny+maxy)/2;
+  const V=pts.slice();
+  V.push({x:mx-20*dmax,y:my-dmax},{x:mx,y:my+20*dmax},{x:mx+20*dmax,y:my-dmax});
+
+  function mkTri(a,b,c){
+    const ax=V[a].x,ay=V[a].y,bx=V[b].x,by=V[b].y,cx=V[c].x,cy=V[c].y;
+    const d=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
+    let ux,uy;
+    if(Math.abs(d)<1e-12){ ux=(ax+bx+cx)/3; uy=(ay+by+cy)/3; }
+    else{
+      const a2=ax*ax+ay*ay,b2=bx*bx+by*by,c2=cx*cx+cy*cy;
+      ux=(a2*(by-cy)+b2*(cy-ay)+c2*(ay-by))/d;
+      uy=(a2*(cx-bx)+b2*(ax-cx)+c2*(bx-ax))/d;
+    }
+    const rx=ax-ux, ry=ay-uy;
+    return {a,b,c,cx:ux,cy:uy,r2:(rx*rx+ry*ry)*1.000001};
+  }
+
+  let tris=[mkTri(n,n+1,n+2)];
+  const order=[]; for(let i=0;i<n;i++) order.push(i);
+  const rnd=rngFrom(97);                        /* feste Reihenfolge, stabile Netze */
+  for(let i=order.length-1;i>0;i--){
+    const j=(rnd()*(i+1))|0; const t=order[i]; order[i]=order[j]; order[j]=t;
+  }
+
+  const edges=[];
+  for(const idx of order){
+    const px=V[idx].x, py=V[idx].y;
+    edges.length=0;
+    const keep=[];
+    for(let t=0;t<tris.length;t++){
+      const T=tris[t], dx=px-T.cx, dy=py-T.cy;
+      if(dx*dx+dy*dy<T.r2){
+        pushEdge(edges,T.a,T.b); pushEdge(edges,T.b,T.c); pushEdge(edges,T.c,T.a);
+      } else keep.push(T);
+    }
+    tris=keep;
+    for(let e=0;e<edges.length;e+=3)
+      if(edges[e+2]===1) tris.push(mkTri(edges[e],edges[e+1],idx));
+  }
+  return tris.filter(T=>T.a<n&&T.b<n&&T.c<n);
+}
+function pushEdge(E,a,b){
+  const lo=a<b?a:b, hi=a<b?b:a;
+  for(let i=0;i<E.length;i+=3) if(E[i]===lo&&E[i+1]===hi){ E[i+2]=0; return; }
+  E.push(lo,hi,1);
+}
+
+/** Gitterindex fuer Nachbarschaftsanfragen in Analysepixeln. */
+function spatialIndex(nodes,cell){
+  const map=new Map();
+  const key=(gx,gy)=>gx*100003+gy;
+  nodes.forEach((n,i)=>{
+    const k=key((n.x/cell)|0,(n.y/cell)|0);
+    let a=map.get(k); if(!a){a=[];map.set(k,a);} a.push(i);
+  });
+  return {
+    near(x,y,r){
+      const out=[], g=Math.ceil(r/cell), gx=(x/cell)|0, gy=(y/cell)|0;
+      for(let dy=-g;dy<=g;dy++)for(let dx=-g;dx<=g;dx++){
+        const a=map.get(key(gx+dx,gy+dy)); if(a) for(const i of a) out.push(i);
+      }
+      return out;
+    }
+  };
+}
+
+function buildLinks(nodes,maxD){
+  const L=[], seen=new Set();
+  const add=(i,j)=>{
+    if(i===j) return;
+    const lo=i<j?i:j, hi=i<j?j:i, k=lo*1000003+hi;
+    if(seen.has(k)) return; seen.add(k);
+    const a=nodes[lo], b=nodes[hi];
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(d>maxD) return;
+    L.push({a:lo,b:hi,d:d/maxD,w:(a.m+b.m)*.5});
+  };
+  const mode=P.linkMode;
+
+  if(mode==='delaunay'||mode==='hybrid'){
+    const sub=nodes.length>3000?nodes.slice(0,3000):nodes;
+    for(const T of triangulate(sub)){ add(T.a,T.b); add(T.b,T.c); add(T.c,T.a); }
+  }
+  if(mode==='proximity'){
+    const ix=spatialIndex(nodes,maxD);
+    for(let i=0;i<nodes.length;i++){
+      const n=nodes[i], cand=[];
+      for(const j of ix.near(n.x,n.y,maxD)){
+        if(j<=i) continue;
+        const d=Math.hypot(nodes[j].x-n.x,nodes[j].y-n.y);
+        if(d<=maxD) cand.push([d,j]);
+      }
+      cand.sort((A,B)=>A[0]-B[0]);
+      for(let q=0;q<Math.min(4,cand.length);q++) add(i,cand[q][1]);
+    }
+  }
+  if(mode==='chain'){
+    const ix=spatialIndex(nodes,maxD);
+    const used=new Uint8Array(nodes.length);
+    const order=nodes.map((n,i)=>i).sort((A,B)=>nodes[B].s-nodes[A].s);
+    for(const start of order){
+      if(used[start]) continue;
+      used[start]=1;
+      for(const dir of [0,1]){
+        let cur=start, ca=nodes[start].a+(dir?Math.PI:0);
+        for(let step=0;step<600;step++){
+          const c=nodes[cur]; let best=-1,bs=0;
+          for(const j of ix.near(c.x,c.y,maxD)){
+            if(used[j]) continue;
+            const dx=nodes[j].x-c.x, dy=nodes[j].y-c.y, d=Math.hypot(dx,dy);
+            if(d<1e-6||d>maxD) continue;
+            const dot=(dx/d)*Math.cos(ca)+(dy/d)*Math.sin(ca);
+            if(dot<0.3) continue;
+            const sc=dot*dot*dot*(1-0.7*d/maxD);
+            if(sc>bs){bs=sc;best=j;}
+          }
+          if(best<0) break;
+          add(cur,best); used[best]=1;
+          ca=Math.atan2(nodes[best].y-c.y,nodes[best].x-c.x);
+          cur=best;
+        }
+      }
+    }
+  }
+  if(mode==='radial'||mode==='hybrid'){
+    const hubs=nodes.map((n,i)=>i).sort((A,B)=>nodes[B].s-nodes[A].s).slice(0,6);
+    const reach=maxD*(mode==='hybrid'?2:5);
+    for(let i=0;i<nodes.length;i++){
+      let best=-1,bd=Infinity;
+      for(const hb of hubs){
+        if(hb===i) continue;
+        const d=Math.hypot(nodes[hb].x-nodes[i].x,nodes[hb].y-nodes[i].y);
+        if(d<bd){bd=d;best=hb;}
+      }
+      if(best>=0&&bd<=reach){
+        const lo=Math.min(i,best),hi=Math.max(i,best),k=lo*1000003+hi;
+        if(!seen.has(k)){ seen.add(k);
+          L.push({a:lo,b:hi,d:Math.min(1,bd/reach),w:(nodes[lo].m+nodes[hi].m)*.5}); }
+      }
+    }
+  }
+  if(mode==='ortho'||mode==='hybrid'){
+    const tol=Math.max(1.2,maxD*0.045);
+    const ix=spatialIndex(nodes,maxD);
+    for(let i=0;i<nodes.length;i++){
+      const n=nodes[i]; let bx=-1,bxd=Infinity,by=-1,byd=Infinity;
+      for(const j of ix.near(n.x,n.y,maxD)){
+        if(j===i) continue;
+        const dx=nodes[j].x-n.x, dy=nodes[j].y-n.y;
+        if(Math.abs(dy)<tol&&dx>0&&dx<maxD&&dx<bxd){bxd=dx;bx=j;}
+        if(Math.abs(dx)<tol&&dy>0&&dy<maxD&&dy<byd){byd=dy;by=j;}
+      }
+      if(bx>=0) add(i,bx);
+      if(by>=0) add(i,by);
+    }
+  }
+  return L;
+}
+
+/** Hoehenlinien gleicher Helligkeit (Marching Squares). */
+function buildContours(){
+  const det=P.lineDetail/100;
+  const long=Math.round(lerp(130,620,det*det));
+  const s=Math.min(1,long/Math.max(FIELD.w,FIELD.h));
+  const w=Math.max(4,Math.round(FIELD.w*s)), h=Math.max(4,Math.round(FIELD.h*s));
+  const f=new Float32Array(w*h);
+  let lo=Infinity,hi=-Infinity;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const v=bil(FIELD.lum,FIELD.w,FIELD.h,x/(w-1)*(FIELD.w-1),y/(h-1)*(FIELD.h-1));
+    f[y*w+x]=v; if(v<lo)lo=v; if(v>hi)hi=v;
+  }
+  const segs=[]; const levels=Math.round(P.contourLevels);
+  if(hi-lo<1e-3) return segs;
+  for(let li=1;li<=levels;li++){
+    const iso=lo+(hi-lo)*(li/(levels+1));
+    for(let y=0;y<h-1;y++){
+      for(let x=0;x<w-1;x++){
+        const v0=f[y*w+x], v1=f[y*w+x+1], v2=f[(y+1)*w+x+1], v3=f[(y+1)*w+x];
+        let ci=0;
+        if(v0>iso)ci|=1; if(v1>iso)ci|=2; if(v2>iso)ci|=4; if(v3>iso)ci|=8;
+        if(ci===0||ci===15) continue;
+        const t=(a,b)=>(iso-a)/((b-a)||1e-6);
+        const top   =[x+t(v0,v1),y], right=[x+1,y+t(v1,v2)],
+              bottom=[x+t(v3,v2),y+1], left =[x,y+t(v0,v3)];
+        const pick=MS[ci];
+        for(let q=0;q<pick.length;q+=2){
+          const A=[top,right,bottom,left][pick[q]], B=[top,right,bottom,left][pick[q+1]];
+          segs.push(A[0]/(w-1),A[1]/(h-1),B[0]/(w-1),B[1]/(h-1),
+            clamp((iso-lo)/(hi-lo),0,1));
+        }
+        if(segs.length>340000) return segs;
+      }
+    }
+  }
+  return segs;
+}
+/* 0 oben, 1 rechts, 2 unten, 3 links */
+const MS={1:[0,3],2:[0,1],3:[1,3],4:[1,2],5:[0,1,2,3],6:[0,2],7:[2,3],
+          8:[2,3],9:[0,2],10:[0,3,1,2],11:[1,2],12:[1,3],13:[0,1],14:[0,3]};
+
+function bil(a,w,h,x,y){
+  const x0=clamp(Math.floor(x),0,w-1), y0=clamp(Math.floor(y),0,h-1);
+  const x1=Math.min(w-1,x0+1), y1=Math.min(h-1,y0+1), fx=x-x0, fy=y-y0;
+  return (a[y0*w+x0]*(1-fx)+a[y0*w+x1]*fx)*(1-fy)+(a[y1*w+x0]*(1-fx)+a[y1*w+x1]*fx)*fy;
+}
+
+/** Stromlinien quer zum Gradienten — sie folgen den Kanten. */
+function buildFlow(){
+  const det=P.lineDetail/100;
+  const seeds=Math.round(lerp(140,2600,det*det));
+  const steps=Math.round(lerp(8,240,P.flowLength/100));
+  const rnd=rngFrom(P.seed*31+7);
+  const W=FIELD.w,H=FIELD.h, out=[];
+  const cols=Math.max(2,Math.round(Math.sqrt(seeds*W/H))), rows=Math.max(2,Math.round(seeds/cols));
+  const stop=FIELD.med;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const sx=(c+0.15+rnd()*0.7)/cols*W, sy=(r+0.15+rnd()*0.7)/rows*H;
+      if(bil(FIELD.mag,W,H,sx,sy)<stop) continue;
+      const line=[];
+      for(const dir of [1,-1]){
+        let x=sx,y=sy,px=0,py=0,have=false;
+        const part=[];
+        for(let i=0;i<steps;i++){
+          const a=bil(FIELD.ang,W,H,x,y);
+          let tx=-Math.sin(a)*dir, ty=Math.cos(a)*dir;
+          if(have&&(tx*px+ty*py)<0){ tx=-tx; ty=-ty; }
+          px=tx; py=ty; have=true;
+          x+=tx*1.35; y+=ty*1.35;
+          if(x<1||y<1||x>W-2||y>H-2) break;
+          if(bil(FIELD.mag,W,H,x,y)<stop) break;
+          part.push(x/W,y/H);
+        }
+        if(dir===1) line.push(...part);
+        else{
+          const rev=[];
+          for(let i=part.length-2;i>=0;i-=2) rev.push(part[i],part[i+1]);
+          line.unshift(...rev);
+        }
+      }
+      if(line.length>=6) out.push(line);
+      if(out.length>4200) return out;
+    }
+  }
+  return out;
+}
+
+/** Konstruktives Raster: rekursive Teilung entlang der Bilddichte. */
+function buildGrid(nodes){
+  const cells=[], rnd=rngFrom(P.seed*13+5);
+  const N=24, dens=new Float32Array(N*N);
+  for(const n of nodes){
+    const gx=Math.min(N-1,(n.nx*N)|0), gy=Math.min(N-1,(n.ny*N)|0);
+    dens[gy*N+gx]+=1;
+  }
+  let dmax=1; for(let i=0;i<dens.length;i++) if(dens[i]>dmax) dmax=dens[i];
+  const densAt=(x,y,w,h)=>{
+    let s=0,c=0;
+    const x0=Math.max(0,(x*N)|0), x1=Math.min(N-1,((x+w)*N)|0);
+    const y0=Math.max(0,(y*N)|0), y1=Math.min(N-1,((y+h)*N)|0);
+    for(let gy=y0;gy<=y1;gy++)for(let gx=x0;gx<=x1;gx++){ s+=dens[gy*N+gx]; c++; }
+    return c?clamp(s/c/dmax,0,1):0;
+  };
+
+  const M=Math.round(P.gridModules);
+  if(P.gridProgram==='measure'){
+    for(let y=0;y<M;y++)for(let x=0;x<M;x++)
+      cells.push({x:x/M,y:y/M,w:1/M,h:1/M,d:densAt(x/M,y/M,1/M,1/M),depth:0,f:rnd(),tick:true});
+    return cells;
+  }
+
+  const varn=P.gridVariation/100, adh=P.gridAdherence/100;
+  const maxDepth=clamp(Math.round(Math.log2(M))+3,3,8);
+  const split=(x,y,w,h,depth)=>{
+    const d=densAt(x,y,w,h);
+    const pr=lerp(0.42,d,adh)*(0.55+varn*0.9);
+    if(depth<maxDepth&&Math.min(w,h)>0.045&&rnd()<pr){
+      const horiz=(w>=h)?rnd()>0.18:rnd()<0.18;
+      const t=clamp(0.5+(rnd()-0.5)*varn*0.85,0.18,0.82);
+      if(horiz){ split(x,y,w*t,h,depth+1); split(x+w*t,y,w*(1-t),h,depth+1); }
+      else     { split(x,y,w,h*t,depth+1); split(x,y+h*t,w,h*(1-t),depth+1); }
+    } else cells.push({x,y,w,h,d,depth,f:rnd()});
+  };
+  const R=Math.max(2,Math.round(M/2));
+  for(let y=0;y<R;y++)for(let x=0;x<R;x++) split(x/R,y/R,1/R,1/R,0);
+  return cells;
+}
+
+/** Alles Abgeleitete neu berechnen. */
+function bake(){
+  const t0=performance.now();
+  const nodes=FIELD.nodes;
+  /* Knotenzeichen */
+  const e=lerp(2.8,0.5,P.hierarchy/100);
+  const SHAPES=['circle','square','diamond','cross','bracket','tick'];
+  for(let i=0;i<nodes.length;i++){
+    const n=nodes[i];
+    const h1=hash3(P.seed,i,11), h2=hash3(P.seed,i,23), h3=hash3(P.seed,i,37);
+    let sz=lerp(P.minShape,P.maxShape,Math.pow(clamp(n.s,0,1),e));
+    sz*=1+(h1-0.5)*(P.shapeJitter/100)*1.4;
+    n.sz=Math.max(0.3,sz);
+    n.shape=P.shape==='mixed'?SHAPES[(h2*SHAPES.length)|0]:P.shape;
+    n.rot=P.alignTangent?n.a:h3*TAU;
+    n.h=h3;
+  }
+
+  /* Verbindungen — Spannweite in Analysepixeln */
+  let links=[];
+  if(P.linksOn&&nodes.length>1){
+    const d=P.maxDistance*(Math.min(FIELD.w,FIELD.h)/1080)*3.2;
+    links=buildLinks(nodes,Math.max(4,d));
+    const keep=P.linkKeep/100;
+    links=links.filter((l,i)=>hash3(P.seed,l.a*7+l.b,5)<keep);
+  }
+
+  const contours=(P.contourOn&&P.contourMode==='topo')?buildContours():[];
+  const flow=(P.contourOn&&P.contourMode==='flow')?buildFlow():[];
+  const cells=P.gridOn?buildGrid(nodes):[];
+
+  BAKE++;
+  GEO={nodes,links,contours,flow,cells,ms:performance.now()-t0};
+  $('#stNodes').textContent=nodes.length;
+  $('#stLinks').textContent=links.length;
+  $('#stSegs').textContent=P.contourMode==='flow'?flow.length:(contours.length/5)|0;
+}
+
+/* ================================================================ Zeichnen */
+const VIEW=$('#view'), VCTX=VIEW.getContext('2d');
+let rasterCache={key:'',cv:null};
+let colorCache={key:'',arr:null};
+let noiseCache={key:'',cv:null};
+
+const pal=()=>PALETTES[P.palette];
+
+function drawCover(ctx,img,W,H){
+  const iw=img.width,ih=img.height, s=Math.max(W/iw,H/ih);
+  const w=iw*s,h=ih*s;
+  ctx.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+}
+function hex2rgb(hx){
+  const v=parseInt(hx.slice(1),16);
+  return [(v>>16)&255,(v>>8)&255,v&255];
+}
+function mix(a,b,t){
+  return 'rgb('+Math.round(lerp(a[0],b[0],t))+','+Math.round(lerp(a[1],b[1],t))+','+
+    Math.round(lerp(a[2],b[2],t))+')';
+}
+
+/* -------- Farbzuordnung der Knoten -------- */
+function ensureColors(){
+  const key=P.colorMode+'|'+P.palette+'|'+BAKE;
+  if(colorCache.key===key) return colorCache.arr;
+  const pp=pal(), ink=hex2rgb(pp.ink), line=hex2rgb(pp.line), mark=hex2rgb(pp.mark);
+  const arr=new Array(GEO.nodes.length);
+  GEO.nodes.forEach((n,i)=>{
+    if(P.colorMode==='source')      arr[i]='rgb('+n.r+','+n.g+','+n.b+')';
+    else if(P.colorMode==='hybrid') arr[i]=mix([n.r,n.g,n.b],ink,0.45);
+    else if(P.colorMode==='duotone'){
+      const l=clamp((0.2126*n.r+0.7152*n.g+0.0722*n.b)/255,0,1);
+      arr[i]=mix(line,mark,l);
+    }
+    else arr[i]=pp.ink;
+  });
+  colorCache={key,arr}; return arr;
+}
+
+/* -------- Dither -------- */
+const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+function makeDither(W,H){
+  const pitch=Math.max(1,Math.round(P.ditherPitch*Math.min(W,H)/1080));
+  const dw=Math.max(2,Math.round(W/pitch)), dh=Math.max(2,Math.round(H/pitch));
+  const s=document.createElement('canvas'); s.width=dw; s.height=dh;
+  const sx=s.getContext('2d',{willReadFrequently:true});
+  drawCover(sx,SRC.canvas,dw,dh);
+  const d=sx.getImageData(0,0,dw,dh).data;
+  const n=dw*dh, g=new Float32Array(n);
+  const ct=lerp(0.55,2.4,P.ditherContrast/100);
+  for(let i=0,j=0;i<n;i++,j+=4){
+    let v=(0.2126*d[j]+0.7152*d[j+1]+0.0722*d[j+2])/255;
+    g[i]=clamp((v-0.5)*ct+0.5,0,1);
+  }
+  if(P.ditherEdge>0){
+    const amt=P.ditherEdge/100*0.9, src=g.slice();
+    for(let y=1;y<dh-1;y++)for(let x=1;x<dw-1;x++){
+      const i=y*dw+x;
+      const gx=src[i+1]-src[i-1], gy=src[i+dw]-src[i-dw];
+      const e=clamp(Math.sqrt(gx*gx+gy*gy)*2.2,0,1);
+      g[i]=clamp(src[i]+(src[i]>0.5?e:-e)*amt,0,1);
+    }
+  }
+  const thr=P.ditherThreshold/100, out=new Uint8Array(n), algo=P.ditherAlgo;
+  if(algo==='bayer'){
+    for(let y=0;y<dh;y++)for(let x=0;x<dw;x++){
+      const i=y*dw+x;
+      out[i]=g[i]>thr*2*((BAYER[(y&3)*4+(x&3)]+0.5)/16)?1:0;
+    }
+  } else if(algo==='noise'){
+    for(let y=0;y<dh;y++)for(let x=0;x<dw;x++){
+      const i=y*dw+x;
+      out[i]=g[i]>lerp(thr*0.35,thr*1.75,hash3(P.seed,x,y))?1:0;
+    }
+  } else {
+    const fs=algo==='floyd';
+    for(let y=0;y<dh;y++){
+      for(let x=0;x<dw;x++){
+        const i=y*dw+x, old=g[i], nv=old>thr?1:0;
+        out[i]=nv;
+        const err=old-nv;
+        const put=(X,Y,f)=>{ if(X<0||Y<0||X>=dw||Y>=dh) return; g[Y*dw+X]+=err*f; };
+        if(fs){ put(x+1,y,7/16); put(x-1,y+1,3/16); put(x,y+1,5/16); put(x+1,y+1,1/16); }
+        else  { const f=1/8; put(x+1,y,f);put(x+2,y,f);put(x-1,y+1,f);
+                put(x,y+1,f);put(x+1,y+1,f);put(x,y+2,f); }
+      }
+    }
+  }
+  const ink=INKS[P.ditherInk];
+  const paper=P.ditherInvert?ink.ink:ink.paper, mark=P.ditherInvert?ink.paper:ink.ink;
+  const o=document.createElement('canvas'); o.width=W; o.height=H;
+  const ox=o.getContext('2d');
+  ox.fillStyle=paper; ox.fillRect(0,0,W,H);
+  ox.fillStyle=mark;
+  for(let y=0;y<dh;y++)for(let x=0;x<dw;x++)
+    if(out[y*dw+x]) ox.fillRect(x*pitch,y*pitch,pitch,pitch);
+  return o;
+}
+
+/* -------- Hintergrund, Quelle, Dither in einem Zwischenbild -------- */
+function ensureRaster(W,H){
+  const key=[W,H,SRC.id,P.palette,P.colorMode,P.sourceOpacity,P.backdrop,P.ditherOn,P.ditherAlgo,
+    P.ditherPitch,P.ditherThreshold,P.ditherContrast,P.ditherEdge,P.ditherInk,P.ditherInvert,
+    P.ditherOpacity,P.ditherBlend,P.seed].join('|');
+  if(rasterCache.key===key) return rasterCache.cv;
+  const pp=pal();
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const x=cv.getContext('2d');
+  x.fillStyle=pp.light?'#ffffff':'#000000'; x.fillRect(0,0,W,H);
+  x.globalAlpha=P.backdrop/100; x.fillStyle=pp.bg; x.fillRect(0,0,W,H);
+  x.globalAlpha=1;
+
+  if(P.sourceOpacity>0){
+    const l=document.createElement('canvas'); l.width=W; l.height=H;
+    const lx=l.getContext('2d');
+    if(P.colorMode==='duotone'||P.colorMode==='flat') lx.filter='grayscale(1)';
+    drawCover(lx,SRC.canvas,W,H);
+    lx.filter='none';
+    if(P.colorMode==='duotone'){
+      lx.globalCompositeOperation='multiply';
+      const gr=lx.createLinearGradient(0,0,W,H);
+      gr.addColorStop(0,pp.line); gr.addColorStop(1,pp.mark);
+      lx.fillStyle=gr; lx.fillRect(0,0,W,H);
+      lx.globalCompositeOperation='source-over';
+    }
+    x.globalAlpha=P.sourceOpacity/100;
+    x.drawImage(l,0,0);
+    x.globalAlpha=1;
+  }
+  if(P.ditherOn){
+    x.globalAlpha=P.ditherOpacity/100;
+    x.globalCompositeOperation=P.ditherBlend;
+    x.drawImage(makeDither(W,H),0,0);
+    x.globalCompositeOperation='source-over';
+    x.globalAlpha=1;
+  }
+  rasterCache={key,cv}; return cv;
+}
+
+function ensureNoise(){
+  const key=P.seed+'|n';
+  if(noiseCache.key===key) return noiseCache.cv;
+  const S=220, cv=document.createElement('canvas'); cv.width=S; cv.height=S;
+  const cx=cv.getContext('2d'), id=cx.createImageData(S,S), d=id.data;
+  for(let i=0,j=0;i<S*S;i++,j+=4){
+    const v=(hash3(P.seed,i,91)*255)|0;
+    d[j]=d[j+1]=d[j+2]=v; d[j+3]=255;
+  }
+  cx.putImageData(id,0,0);
+  noiseCache={key,cv}; return cv;
+}
+
+/* -------- Formen -------- */
+function shapePath(ctx,x,y,r,rot,kind){
+  const c=Math.cos(rot), s=Math.sin(rot);
+  const R=(dx,dy)=>[x+dx*c-dy*s, y+dx*s+dy*c];
+  let p;
+  switch(kind){
+    case 'square':
+      p=R(-r,-r); ctx.moveTo(p[0],p[1]);
+      p=R(r,-r); ctx.lineTo(p[0],p[1]);
+      p=R(r,r);  ctx.lineTo(p[0],p[1]);
+      p=R(-r,r); ctx.lineTo(p[0],p[1]); ctx.closePath(); break;
+    case 'diamond':
+      p=R(0,-r); ctx.moveTo(p[0],p[1]);
+      p=R(r,0);  ctx.lineTo(p[0],p[1]);
+      p=R(0,r);  ctx.lineTo(p[0],p[1]);
+      p=R(-r,0); ctx.lineTo(p[0],p[1]); ctx.closePath(); break;
+    case 'cross':
+      p=R(-r,0); ctx.moveTo(p[0],p[1]); p=R(r,0); ctx.lineTo(p[0],p[1]);
+      p=R(0,-r); ctx.moveTo(p[0],p[1]); p=R(0,r); ctx.lineTo(p[0],p[1]); break;
+    case 'tick':
+      p=R(0,-r); ctx.moveTo(p[0],p[1]); p=R(0,r); ctx.lineTo(p[0],p[1]); break;
+    case 'bracket':{
+      const a=r*0.55;
+      p=R(-r,-r+a); ctx.moveTo(p[0],p[1]);
+      p=R(-r,-r);   ctx.lineTo(p[0],p[1]);
+      p=R(-r+a,-r); ctx.lineTo(p[0],p[1]);
+      p=R(r-a,r);   ctx.moveTo(p[0],p[1]);
+      p=R(r,r);     ctx.lineTo(p[0],p[1]);
+      p=R(r,r-a);   ctx.lineTo(p[0],p[1]); break; }
+    default:
+      ctx.moveTo(x+r,y); ctx.arc(x,y,r,0,TAU);
+  }
+}
+
+/* -------- Hauptbild -------- */
+function paint(ctx,W,H,t){
+  const pp=pal(), u=Math.min(W,H)/1080;
+  ctx.save();
+  ctx.drawImage(ensureRaster(W,H),0,0);
+
+  if(COMPARE){
+    ctx.globalAlpha=1; ctx.fillStyle=pp.light?'#fff':'#000'; ctx.fillRect(0,0,W,H);
+    drawCover(ctx,SRC.canvas,W,H);
+    ctx.restore(); return;
+  }
+  if(!GEO){ ctx.restore(); return; }
+  const cols=ensureColors();
+  ctx.lineCap='round'; ctx.lineJoin='round';
+
+  /* Raster */
+  if(P.gridOn&&GEO.cells.length) drawGrid(ctx,W,H,u,pp);
+
+  /* Hoehenlinien / Stromlinien */
+  if(P.contourOn&&P.contourOpacity>0){
+    ctx.globalAlpha=P.contourOpacity/100;
+    ctx.strokeStyle=P.colorMode==='flat'?pp.line:pp.ink;
+    ctx.lineWidth=Math.max(.3,0.8*u*lerp(1.6,.55,P.lineDetail/100));
+    if(P.contourMode==='topo'){
+      const s=GEO.contours; ctx.beginPath();
+      for(let i=0;i<s.length;i+=5){
+        ctx.moveTo(s[i]*W,s[i+1]*H); ctx.lineTo(s[i+2]*W,s[i+3]*H);
+      }
+      ctx.stroke();
+    } else {
+      const drift=P.flowSpeed>0?(t*P.flowSpeed*0.06):0;
+      if(P.flowSpeed>0){ ctx.setLineDash([26*u,14*u]); ctx.lineDashOffset=-drift; }
+      ctx.beginPath();
+      for(const L of GEO.flow){
+        ctx.moveTo(L[0]*W,L[1]*H);
+        for(let i=2;i<L.length;i+=2) ctx.lineTo(L[i]*W,L[i+1]*H);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  /* Verbindungen */
+  if(P.linksOn&&GEO.links.length){
+    const N=GEO.nodes, fade=P.linkFade/100;
+    ctx.lineWidth=Math.max(.15,P.linkWeight*u);
+    let last='';
+    for(const l of GEO.links){
+      const a=N[l.a], b=N[l.b];
+      const al=clamp((0.25+0.75*l.w)*(1-fade*l.d),0.02,1);
+      const col=P.colorMode==='flat'?pp.line:cols[l.a];
+      if(col!==last){ ctx.strokeStyle=col; last=col; }
+      ctx.globalAlpha=al;
+      ctx.beginPath(); ctx.moveTo(a.nx*W,a.ny*H); ctx.lineTo(b.nx*W,b.ny*H); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  /* Knoten */
+  if(P.nodesOn){
+    ctx.lineWidth=Math.max(.2,P.shapeStroke*u);
+    const fill=P.shapeFill/100;
+    let last='';
+    for(let i=0;i<GEO.nodes.length;i++){
+      const n=GEO.nodes[i], r=n.sz*u;
+      if(r<0.15) continue;
+      const col=cols[i];
+      if(col!==last){ ctx.strokeStyle=col; ctx.fillStyle=col; last=col; }
+      ctx.beginPath();
+      shapePath(ctx,n.nx*W,n.ny*H,r,n.rot,n.shape);
+      if(fill>0&&n.shape!=='cross'&&n.shape!=='tick'&&n.shape!=='bracket'){
+        ctx.globalAlpha=fill*(0.4+0.6*n.m); ctx.fill();
+      }
+      ctx.globalAlpha=clamp(0.35+0.65*n.m,0,1);
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  /* Beschriftung der staerksten Knoten */
+  if(P.labelsOn){
+    const N=GEO.nodes.slice().sort((a,b)=>b.s-a.s).slice(0,Math.round(P.labelCount));
+    ctx.font=Math.max(7,9.5*u).toFixed(1)+'px '+MONO;
+    ctx.fillStyle=pp.mark; ctx.globalAlpha=.8;
+    N.forEach((n,i)=>{
+      const x=n.nx*W, y=n.ny*H, r=Math.max(3,n.sz*u);
+      ctx.globalAlpha=.35;
+      ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+r+9*u,y-7*u); ctx.strokeStyle=pp.mark;
+      ctx.lineWidth=Math.max(.3,.6*u); ctx.stroke();
+      ctx.globalAlpha=.85;
+      ctx.fillText(pad(i+1,2)+' / '+Math.round(n.nx*1000)+'·'+Math.round(n.ny*1000),
+        x+r+11*u, y-8*u);
+    });
+    ctx.globalAlpha=1;
+  }
+
+  /* Oberflaeche */
+  if(P.scanOn&&P.scanOpacity>0){
+    const sp=Math.max(2,P.scanSpacing*u);
+    const off=P.flowSpeed>0?((t*P.flowSpeed*0.02)%sp):0;
+    ctx.globalAlpha=P.scanOpacity/100;
+    ctx.fillStyle=pp.light?'#000':'#000';
+    for(let y=off;y<H;y+=sp) ctx.fillRect(0,y,W,Math.max(1,sp*0.34));
+    ctx.globalAlpha=1;
+  }
+  if(P.grain>0){
+    const nz=ensureNoise();
+    ctx.globalAlpha=P.grain/100*0.5;
+    ctx.globalCompositeOperation='overlay';
+    const pt=ctx.createPattern(nz,'repeat');
+    ctx.fillStyle=pt; ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation='source-over';
+    ctx.globalAlpha=1;
+  }
+  if(P.vignette>0){
+    const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.22,W/2,H/2,Math.max(W,H)*0.78);
+    g.addColorStop(0,'rgba(0,0,0,0)');
+    g.addColorStop(1,'rgba(0,0,0,'+(P.vignette/100*0.85).toFixed(3)+')');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  }
+  if(P.frameOn) drawFrame(ctx,W,H,u,pp);
+  ctx.restore();
+}
+const MONO='ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+const pad=(v,n)=>String(v).padStart(n,'0');
+
+function drawGrid(ctx,W,H,u,pp){
+  const gut=P.gridGutter*u, neg=P.gridNegative/100, prog=P.gridProgram;
+  ctx.globalAlpha=P.gridOpacity/100;
+  ctx.strokeStyle=P.colorMode==='flat'?pp.line:pp.mark;
+  ctx.lineWidth=Math.max(.25,0.7*u);
+  ctx.font=Math.max(6,7.5*u)+'px '+MONO;
+  ctx.fillStyle=pp.mark;
+  GEO.cells.forEach((c,i)=>{
+    if(prog!=='measure'&&hash3(P.seed,i,71)<neg) return;
+    const x=c.x*W+gut/2, y=c.y*H+gut/2, w=c.w*W-gut, h=c.h*H-gut;
+    if(w<=1||h<=1) return;
+    if(prog==='fragment'&&c.f>0.62){
+      ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+      const s=Math.max(W/SRC.w,H/SRC.h), dw=SRC.w*s, dh=SRC.h*s;
+      ctx.globalAlpha=clamp(P.gridOpacity/100,0,1);
+      ctx.drawImage(SRC.canvas,(W-dw)/2,(H-dh)/2,dw,dh);
+      ctx.restore();
+      ctx.globalAlpha=P.gridOpacity/100;
+    }
+    ctx.strokeRect(x,y,w,h);
+    if(prog==='measure'&&c.tick){
+      const t=Math.min(w,h)*0.18;
+      ctx.beginPath();
+      ctx.moveTo(x,y); ctx.lineTo(x+t,y); ctx.moveTo(x,y); ctx.lineTo(x,y+t);
+      ctx.stroke();
+    }
+    if(prog==='data'&&w>34*u&&h>16*u){
+      ctx.fillText(pad(i+1,3)+'·'+Math.round(c.d*100), x+4*u, y+10*u);
+    }
+  });
+  ctx.globalAlpha=1;
+}
+
+function drawFrame(ctx,W,H,u,pp){
+  const m=26*u, L=20*u;
+  ctx.strokeStyle=pp.mark; ctx.globalAlpha=.75;
+  ctx.lineWidth=Math.max(.4,u);
+  const corner=(x,y,sx,sy)=>{
+    ctx.beginPath();
+    ctx.moveTo(x+sx*L,y); ctx.lineTo(x,y); ctx.lineTo(x,y+sy*L); ctx.stroke();
+  };
+  corner(m,m,1,1); corner(W-m,m,-1,1); corner(m,H-m,1,-1); corner(W-m,H-m,-1,-1);
+  ctx.globalAlpha=.85; ctx.fillStyle=pp.mark;
+  ctx.font=Math.max(8,11*u)+'px '+MONO;
+  ctx.fillText(String(P.title||'').toUpperCase(),m,H-m+13*u);
+  ctx.globalAlpha=.5; ctx.font=Math.max(7,8.5*u)+'px '+MONO;
+  const info=[P.linkMode.toUpperCase(),GEO.nodes.length+' KN',
+    P.contourOn?(P.contourMode==='topo'?'TOPO '+P.contourLevels:'FLOW'):'—','SEED '+P.seed].join('  ·  ');
+  const tw=ctx.measureText(info).width;
+  ctx.fillText(info,W-m-tw,H-m+13*u);
+  ctx.globalAlpha=.5;
+  ctx.fillText('EMEFKA.RT',m,m-9*u);
+  ctx.globalAlpha=1;
+}
+
+/* ================================================================ Quelle */
+let SRCID=0, COMPARE=false;
+
+/** Eingebaute Quelle: ein synthetisches Hoehenzugbild mit klaren Kanten. */
+function defaultSource(){
+  const W=1400,H=1750;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d');
+  const sky=x.createLinearGradient(0,0,0,H*0.72);
+  sky.addColorStop(0,'#14202e'); sky.addColorStop(.42,'#3a4a5c');
+  sky.addColorStop(.72,'#8e8a80'); sky.addColorStop(1,'#e0bb8c');
+  x.fillStyle=sky; x.fillRect(0,0,W,H);
+
+  const sx=W*0.62, sy=H*0.44, R=W*0.15;
+  const halo=x.createRadialGradient(sx,sy,0,sx,sy,R*3.4);
+  halo.addColorStop(0,'rgba(255,226,180,.85)'); halo.addColorStop(.35,'rgba(255,196,128,.28)');
+  halo.addColorStop(1,'rgba(255,180,110,0)');
+  x.fillStyle=halo; x.fillRect(0,0,W,H);
+  x.beginPath(); x.arc(sx,sy,R,0,TAU);
+  x.fillStyle='#ffeccd'; x.fill();
+
+  const rnd=rngFrom(20260921);
+  for(let i=0;i<7;i++){
+    const base=H*(0.40+i*0.088), amp=H*0.062*(1-i*0.06), ph=rnd()*9;
+    x.beginPath(); x.moveTo(0,H); x.lineTo(0,base);
+    for(let px=0;px<=W;px+=6){
+      const t=px/W;
+      const y=base
+        -Math.sin(t*Math.PI*(1.15+i*0.55)+ph)*amp
+        -Math.sin(t*(7+i*2.3)+ph*2)*amp*0.26
+        -Math.sin(t*(19+i*4))*amp*0.07;
+      x.lineTo(px,y);
+    }
+    x.lineTo(W,H); x.closePath();
+    const g=x.createLinearGradient(0,base-H*0.09,0,H);
+    const v=30+i*14;
+    g.addColorStop(0,'rgb('+(v+44)+','+(v+40)+','+(v+36)+')');
+    g.addColorStop(1,'rgb('+(v*0.45|0)+','+(v*0.48|0)+','+(v*0.56|0)+')');
+    x.fillStyle=g; x.fill();
+  }
+  for(let i=0;i<90;i++){
+    const px=rnd()*W, py=rnd()*H*0.5, r=rnd()*2.4+0.4;
+    x.globalAlpha=0.15+rnd()*0.4;
+    x.beginPath(); x.arc(px,py,r,0,TAU); x.fillStyle='#fff'; x.fill();
+  }
+  x.globalAlpha=1;
+  return {canvas:c,w:W,h:H,name:'EINGEBAUTE QUELLE',id:++SRCID};
+}
+
+function setSource(s){
+  SRC=s;
+  $('#srcName').textContent=s.name;
+  $('#srcInfo').textContent=s.w+' × '+s.h+' px';
+  const th=$('#thumb'), tx=th.getContext('2d');
+  tx.fillStyle='#000'; tx.fillRect(0,0,52,52);
+  drawCover(tx,s.canvas,52,52);
+  invalidate('field');
+}
+
+function loadFile(file){
+  if(!file||!/^image\//.test(file.type)){
+    $('#srcInfo').textContent='Format nicht lesbar — bitte ein Bild.'; return;
+  }
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    const MAX=3000;
+    const s=Math.min(1,MAX/Math.max(img.width,img.height));
+    const w=Math.max(2,Math.round(img.width*s)), h=Math.max(2,Math.round(img.height*s));
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(url);
+    setSource({canvas:c,w,h,name:file.name.toUpperCase(),id:++SRCID});
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(url); $('#srcInfo').textContent='Bild konnte nicht gelesen werden.'; };
+  img.src=url;
+}
+
+/* ================================================================ Ablauf */
+const dirty={field:true,geom:true};
+let pending=false, animId=0;
+
+function invalidate(stage){
+  if(stage==='field'){ dirty.field=true; dirty.geom=true; }
+  else if(stage==='geom'){ dirty.geom=true; }
+  schedule();
+}
+function schedule(){
+  if(pending) return; pending=true;
+  const heavy=dirty.field||dirty.geom;
+  if(heavy) $('#busy').classList.add('on');
+  requestAnimationFrame(()=>requestAnimationFrame(run));
+}
+function run(){
+  pending=false;
+  if(!SRC) return;
+  const t0=performance.now();
+  layout();
+  try{
+    if(dirty.field){ analyze(); dirty.field=false; dirty.geom=true; }
+    if(dirty.geom){ bake(); dirty.geom=false; }
+    paint(VCTX,VIEW.width,VIEW.height,performance.now());
+  }catch(err){
+    console.error(err);
+    $('#srcInfo').textContent='Fehler beim Rechnen — siehe Konsole.';
+  }
+  $('#busy').classList.remove('on');
+  $('#stTime').textContent=Math.round(performance.now()-t0)+' MS';
+  $('#stSize').textContent=VIEW.width+'×'+VIEW.height;
+  const wantAnim=P.contourOn&&P.contourMode==='flow'&&P.flowSpeed>0;
+  if(wantAnim&&!animId) animId=requestAnimationFrame(tick);
+  if(!wantAnim&&animId){ cancelAnimationFrame(animId); animId=0; }
+}
+function tick(){
+  animId=0;
+  if(!(P.contourOn&&P.contourMode==='flow'&&P.flowSpeed>0)) return;
+  paint(VCTX,VIEW.width,VIEW.height,performance.now());
+  animId=requestAnimationFrame(tick);
+}
+
+function layout(){
+  const box=$('#canvasWrap').getBoundingClientRect();
+  const pad=window.innerWidth<820?28:48;
+  const availW=Math.max(120,box.width-pad), availH=Math.max(120,box.height-pad);
+  const ar=SRC.w/SRC.h;
+  let w=availW, h=w/ar;
+  if(h>availH){ h=availH; w=h*ar; }
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  let pw=Math.round(w*dpr), ph=Math.round(h*dpr);
+  const cap=2400, s=Math.min(1,cap/Math.max(pw,ph));
+  pw=Math.round(pw*s); ph=Math.round(ph*s);
+  VIEW.style.width=Math.round(w)+'px';
+  VIEW.style.height=Math.round(h)+'px';
+  if(VIEW.width!==pw||VIEW.height!==ph){ VIEW.width=pw; VIEW.height=ph; }
+}
+
+/* ================================================================ Verlauf */
+let undoStack=[], redoStack=[], commitT=0;
+function commit(){
+  clearTimeout(commitT);
+  commitT=setTimeout(()=>{
+    const s=JSON.stringify(P);
+    if(undoStack.length&&undoStack[undoStack.length-1]===s) return;
+    undoStack.push(s);
+    if(undoStack.length>70) undoStack.shift();
+    redoStack.length=0; histBtns();
+  },220);
+}
+function flushCommit(){
+  clearTimeout(commitT);
+  const s=JSON.stringify(P);
+  if(!undoStack.length||undoStack[undoStack.length-1]!==s){
+    undoStack.push(s);
+    if(undoStack.length>70) undoStack.shift();
+  }
+}
+function histBtns(){
+  $('#btnUndo').disabled=undoStack.length<2;
+  $('#btnRedo').disabled=redoStack.length===0;
+}
+function undo(){
+  flushCommit();
+  if(undoStack.length<2) return;
+  redoStack.push(undoStack.pop());
+  P=JSON.parse(undoStack[undoStack.length-1]);
+  invalidate('field'); syncUI(); histBtns();
+}
+function redo(){
+  clearTimeout(commitT);
+  const s=redoStack.pop(); if(!s) return;
+  undoStack.push(s); P=JSON.parse(s);
+  invalidate('field'); syncUI(); histBtns();
+}
+
+/* ================================================================ Export */
+function savePNG(){
+  const ar=SRC.w/SRC.h;
+  let W,H;
+  if(ar>=1){ H=2160; W=Math.round(H*ar); } else { W=2160; H=Math.round(W/ar); }
+  const s=Math.min(1,6000/Math.max(W,H));
+  W=Math.round(W*s); H=Math.round(H*s);
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const keep=rasterCache; rasterCache={key:'',cv:null};
+  paint(c.getContext('2d'),W,H,performance.now());
+  rasterCache=keep;
+  c.toBlob(b=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(b);
+    a.download='emefka-rt_'+P.linkMode+'_'+P.seed+'_'+W+'x'+H+'.png';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  },'image/png');
+}
+
+/* ================================================================ Ereignisse */
+function wire(){
+  $('#fileInput').addEventListener('change',e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
+  $('#btnSave').addEventListener('click',savePNG);
+  $('#btnUndo').addEventListener('click',undo);
+  $('#btnRedo').addEventListener('click',redo);
+  $('#railToggle').addEventListener('click',()=>$('#rail').classList.toggle('hide'));
+
+  const cmp=$('#btnCompare');
+  const on=()=>{COMPARE=true;schedule();}, off=()=>{COMPARE=false;schedule();};
+  cmp.addEventListener('pointerdown',on);
+  addEventListener('pointerup',()=>{ if(COMPARE) off(); });
+  cmp.addEventListener('pointerleave',()=>{ if(COMPARE) off(); });
+
+  const stage=$('#stage'), drop=$('#drop');
+  let depth=0;
+  stage.addEventListener('dragenter',e=>{e.preventDefault();depth++;drop.classList.add('on');});
+  stage.addEventListener('dragover',e=>e.preventDefault());
+  stage.addEventListener('dragleave',()=>{ if(--depth<=0){depth=0;drop.classList.remove('on');} });
+  stage.addEventListener('drop',e=>{
+    e.preventDefault(); depth=0; drop.classList.remove('on');
+    if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+  addEventListener('paste',e=>{
+    for(const it of (e.clipboardData&&e.clipboardData.items)||[])
+      if(it.type.startsWith('image/')){ loadFile(it.getAsFile()); break; }
+  });
+
+  addEventListener('keydown',e=>{
+    if(/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+    const k=e.key.toLowerCase();
+    if(k==='c'&&!COMPARE){ COMPARE=true; schedule(); }
+    else if(k==='r'){ setParam('seed',1+Math.floor(Math.random()*9999)); }
+    else if(k==='s'){ e.preventDefault(); savePNG(); }
+    else if(k==='z'){ undo(); }
+    else if(k==='y'){ redo(); }
+  });
+  addEventListener('keyup',e=>{ if(e.key.toLowerCase()==='c'&&COMPARE){ COMPARE=false; schedule(); } });
+
+  let rt=0;
+  addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>schedule(),140); });
+}
+
+/* ================================================================ Start */
+buildRail();
+wire();
+setSource(defaultSource());
+undoStack.push(JSON.stringify(P));
+histBtns();
+</script>
+</body>
+</html>
