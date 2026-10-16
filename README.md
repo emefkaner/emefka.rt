@@ -55,3 +55,51 @@ fluessig. Geladene Bilder werden auf 3000px lange Kante begrenzt.
 
 Getestet in Chromium. Benoetigt Canvas 2D, `toBlob` und
 `createImageData` — alles seit Jahren ueberall vorhanden.
+
+---
+
+# Ausmisten — Fotos per Wischen sortieren
+
+Eine zweite, eigenstaendige Web-App im Ordner [`ausmisten/`](ausmisten/). Sie
+bildet den Funktionsumfang einer Foto-Aufraeum-App nach und laesst sich als
+App installieren („Zum Home-Bildschirm“). Sie funktioniert auch offline.
+
+## Funktionen
+
+| Bereich | Was es kann |
+|---|---|
+| **Wischen** | Links = Archiv, rechts = behalten, Doppeltippen oder Stern = Favorit. Rueckgaengig-Knopf. Tasten `←` `→` `↑` `Z`. Videos laufen stumm, Antippen schaltet den Ton. |
+| **Sammlungen** | Alle unsortierten, Zufaellig, An diesem Tag, Screenshots, Videos, Groesste Dateien, dazu jeder Monat einzeln mit Fortschrittsbalken. |
+| **Aehnliche und Duplikate** | Bild-Fingerabdruck (128-Bit-dHash). Gleiche Bilder werden immer gruppiert, aehnliche nur innerhalb von 30 Minuten (Serienbilder). Nebeneinander vergleichen, die groesste Datei ist vorausgewaehlt. |
+| **Archiv** | Nichts wird sofort geloescht. Zuruecklegen oder behalten per Auswahl, dann mit einem Tipp leeren, mit Anzeige des freigegebenen Speichers. |
+| **Favoriten** | Uebersicht, abwaehlen, als ZIP herunterladen. |
+| **Fortschritt** | Tagesziel (20/50/100/200), Serie und laengste Serie, Kalender der letzten 17 Wochen, Summen, fertige Monate. |
+| **Datum** | Aufnahmedatum aus EXIF, sonst aus dem Dateinamen, sonst das Aenderungsdatum. |
+
+## Loeschen: was ein Browser darf
+
+* **Chrome oder Edge am Computer:** „Fotoordner oeffnen“ gibt der App Schreibrechte
+  auf den Ordner. „Archiv leeren“ loescht die Dateien dann wirklich. Der Ordner
+  wird gemerkt und kann beim naechsten Mal fortgesetzt werden.
+* **iPhone, Android, Firefox, Safari:** Ein Browser darf Dateien in der Galerie
+  nicht loeschen. Die App merkt sich alle Entscheidungen. Das Archiv laesst sich
+  als Dateiliste herunterladen, und die behaltenen Bilder oder Favoriten als ZIP.
+
+Fortschritt und Entscheidungen liegen nur in diesem Browser (IndexedDB). Die
+Fotos selbst werden nirgendwohin hochgeladen.
+
+## Bewusst weggelassen
+
+Tageslimit fuer Wischvorgaenge, Werbung, Abo und Einladungsprogramm. Das sind
+Geschaeftsmodell-Funktionen der Vorlage, keine Funktionen zum Sortieren.
+
+## Starten
+
+Die App braucht einen Webserver, damit Installation und Offline-Betrieb gehen.
+Zum Beispiel GitHub Pages oder lokal:
+
+```
+cd ausmisten && python3 -m http.server 8000
+```
+
+Direkt als Datei geoeffnet funktioniert sie auch, nur ohne Installation.
