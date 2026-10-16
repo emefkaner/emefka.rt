@@ -1,0 +1,12 @@
+{
+  "appId": "rt.emefka.ausmisten",
+  "appName": "Ausmisten",
+  "webDir": "../ausmisten",
+  "backgroundColor": "#f6efe3",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  }
+}

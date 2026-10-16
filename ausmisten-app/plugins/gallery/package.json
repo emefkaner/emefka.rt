@@ -1,0 +1,15 @@
+{
+  "name": "ausmisten-gallery",
+  "version": "0.1.0",
+  "description": "Zugriff auf die Fotogalerie fuer Ausmisten: auflisten, Vorschauen, loeschen, Favoriten.",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "author": "emefka",
+  "capacitor": {
+    "ios": { "src": "ios" },
+    "android": { "src": "android" }
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^8.0.0"
+  }
+}

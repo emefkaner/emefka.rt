@@ -349,7 +349,11 @@ const MEDIA_RE = /\.(jpe?g|png|gif|webp|avif|heic|heif|bmp|tiff?|mp4|mov|m4v|web
 const VIDEO_RE = /\.(mp4|mov|m4v|webm|3gp)$/i;
 const SHOT_RE = /(screenshot|screen[ _-]?shot|bildschirmfoto|bildschirmaufnahme|screen[ _-]?recording|capture)/i;
 const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-const HAS_FS = typeof window.showDirectoryPicker === 'function';
+const CAP = window.Capacitor;
+const NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
+const PLATFORM = NATIVE ? CAP.getPlatform() : 'web';
+const Gallery = NATIVE ? CAP.registerPlugin('Gallery') : null;
+const HAS_FS = !NATIVE && typeof window.showDirectoryPicker === 'function';
 const GOALS = [20, 50, 100, 200];
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -411,6 +415,7 @@ const S = {
   source: null,       // {kind:'dir'|'files'|'demo', name}
   sel: {archive: new Set(), favs: new Set()},
   savedDir: null,
+  access: null,       // in der App: 'granted' oder 'limited'
 };
 let saveTimer = 0;
 function saveSoon(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 400); }
@@ -423,8 +428,14 @@ const archived = () => S.items.filter(i => S.dec[i.id] && S.dec[i.id].s === 'arc
 const kept = () => S.items.filter(i => S.dec[i.id] && S.dec[i.id].s === 'keep');
 const favs = () => S.items.filter(i => S.dec[i.id] && S.dec[i.id].f && S.dec[i.id].s === 'keep');
 
+function syncFav(items, value){
+  if (PLATFORM !== 'ios') return;
+  const ids = items.filter(i => i && i.nid).map(i => i.nid);
+  if (ids.length) Gallery.setFavorite({ids, value}).catch(() => {});
+}
 function decide(item, s, fav){
   const prev = S.dec[item.id];
+  if (fav && !(prev && prev.f)) syncFav([item], true);
   S.dec[item.id] = {s, f: !!fav || (s === 'keep' && !!(prev && prev.f)), t: Date.now()};
   const k = dayKey();
   S.stats.days[k] = (S.stats.days[k] || 0) + 1;
@@ -433,6 +444,8 @@ function decide(item, s, fav){
   return {id: item.id, prev, day: k};
 }
 function undoDecision(h){
+  const was = S.dec[h.id];
+  if (was && was.f && !(h.prev && h.prev.f)) syncFav([S.byId.get(h.id)], false);
   if (h.prev) S.dec[h.id] = h.prev; else delete S.dec[h.id];
   S.stats.days[h.day] = Math.max(0, (S.stats.days[h.day] || 1) - 1);
   saveSoon();
@@ -541,14 +554,7 @@ function coverDraw(src, w, h, size){
   return c;
 }
 const toBlobUrl = (c, q) => new Promise(res => c.toBlob(b => res(b ? URL.createObjectURL(b) : null), 'image/jpeg', q));
-async function buildThumb(item){
-  if (item.video) return videoThumb(item);
-  let src = null;
-  try { src = await createImageBitmap(item.file); } catch (e){ src = await loadImg(item.file); }
-  if (!src) return null;
-  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
-  if (!w || !h) return null;
-  item.w = w; item.h = h;
+function dhash(src){
   // Fingerabdruck aus waagrechtem und senkrechtem Helligkeitsgefälle, zusammen 128 Bit.
   const hc = document.createElement('canvas'); hc.width = 9; hc.height = 9;
   const hx = hc.getContext('2d', {willReadFrequently: true});
@@ -561,7 +567,27 @@ async function buildThumb(item){
     if (lum(x, y) > lum(x + 1, y)) hash[b >> 5] = (hash[b >> 5] | (1 << (b & 31))) >>> 0;
     if (lum(x, y) > lum(x, y + 1)) hash[2 + (b >> 5)] = (hash[2 + (b >> 5)] | (1 << (b & 31))) >>> 0;
   }
-  item.hash = hash;
+  return hash;
+}
+async function nativeThumb(item){
+  const r = await Gallery.thumbnail({id: item.nid, size: 240});
+  if (!r || !r.data) return null;
+  if (!item.video){
+    const im = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = r.data; });
+    if (im) item.hash = dhash(im);
+  }
+  return r.data;
+}
+async function buildThumb(item){
+  if (item.nid) return nativeThumb(item);
+  if (item.video) return videoThumb(item);
+  let src = null;
+  try { src = await createImageBitmap(item.file); } catch (e){ src = await loadImg(item.file); }
+  if (!src) return null;
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
+  if (!w || !h) return null;
+  item.w = w; item.h = h;
+  item.hash = dhash(src);
   const url = await toBlobUrl(coverDraw(src, w, h, 240), .8);
   if (src.close) src.close();
   return url;
@@ -684,6 +710,41 @@ function loadFileList(files, label){
     {kind: 'files', name: first || label || plural(list.length, 'Datei', 'Dateien')});
 }
 
+/* ---------- Galerie (nur in der App) ---------- */
+async function openGallery(){
+  let st = 'denied';
+  try {
+    st = (await Gallery.status()).status;
+    if (st === 'prompt') st = (await Gallery.requestAccess()).status;
+  } catch (e){}
+  if (st === 'denied'){
+    if (await confirmDlg('Kein Zugriff auf Fotos', 'Erlaube Ausmisten in den Einstellungen, auf deine Fotos zuzugreifen.', 'Einstellungen öffnen')) Gallery.openSettings();
+    return;
+  }
+  S.access = st;
+  await loadGallery();
+}
+async function loadGallery(){
+  resetLibrary();
+  busy('Mediathek wird gelesen…');
+  let r;
+  try { r = await Gallery.list(); }
+  catch (e){ busy(false); renderAll(); toast('Mediathek konnte nicht gelesen werden'); return; }
+  const items = (r.items || []).map(a => ({
+    id: 'ph:' + a.id, nid: a.id, file: null, name: a.name || 'Foto', path: a.name || 'Foto', size: a.size || 0,
+    mtime: a.date, date: a.date || Date.now(), video: !!a.video, shot: !!a.screenshot || SHOT_RE.test(a.name || ''),
+    dir: null, hash: null, w: a.width, h: a.height,
+  }));
+  items.sort((a, b) => b.date - a.date);
+  S.items = items;
+  S.byId = new Map(items.map(i => [i.id, i]));
+  S.source = {kind: 'gallery', name: S.access === 'limited' ? 'Ausgewählte Fotos' : 'Fotos-Mediathek'};
+  busy(false);
+  go('home');
+  renderAll();
+  if (!items.length) toast('Keine Fotos oder Videos gefunden');
+}
+
 /* ---------- Demo-Mediathek: erzeugte Bilder, damit man ohne eigene Fotos probieren kann ---------- */
 function mulberry32(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function drawScene(seed, shift){
@@ -773,13 +834,14 @@ function renderHome(){
         <h2>Schluss mit vollem Speicher</h2>
         <p class="muted">Wische durch deine Fotos und Videos: links ins Archiv, rechts behalten, doppelt tippen für Favoriten. Danach leerst du das Archiv mit einem Tipp.</p>
         <div class="stack">
+          ${NATIVE ? `<button class="btn primary block" data-act="gallery">${ICON.photos}Fotos-Mediathek öffnen</button>` : ''}
           ${S.savedDir && HAS_FS ? `<button class="btn primary block" data-act="resume">${ICON.folder}Weiter mit „${esc(S.savedDir.name)}“</button>` : ''}
           ${HAS_FS ? `<button class="btn ${S.savedDir ? 'ghost' : 'primary'} block" data-act="openDir">${ICON.folder}Fotoordner öffnen</button>` : ''}
-          <button class="btn ${HAS_FS ? 'ghost' : 'primary'} block" data-act="pickFiles">${ICON.photos}Fotos und Videos auswählen</button>
-          ${!HAS_FS ? `<button class="btn ghost block" data-act="pickFolder">${ICON.folder}Ordner auswählen</button>` : ''}
+          ${!NATIVE ? `<button class="btn ${HAS_FS ? 'ghost' : 'primary'} block" data-act="pickFiles">${ICON.photos}Fotos und Videos auswählen</button>` : ''}
+          ${!HAS_FS && !NATIVE ? `<button class="btn ghost block" data-act="pickFolder">${ICON.folder}Ordner auswählen</button>` : ''}
           <button class="btn ghost block" data-act="demo">${ICON.play}Mit Beispielfotos ausprobieren</button>
         </div>
-        <div class="drop">…oder Dateien hier hineinziehen</div>
+        ${NATIVE ? '' : '<div class="drop">…oder Dateien hier hineinziehen</div>'}
         <p class="faint" style="margin-top:16px">Deine Fotos verlassen dieses Gerät nicht. Kein Upload, kein Konto, keine Werbung.</p>
       </div>`;
     return;
@@ -792,7 +854,9 @@ function renderHome(){
         <div class="num">${fmtNum(L.length - done)}</div>
         <div class="muted">noch zu sortieren · ${fmtNum(done)} von ${fmtNum(L.length)} erledigt</div>
         <div class="bar" style="margin:10px 0 6px"><i style="width:${pct}%"></i></div>
-        <div class="src">${esc(S.source.name)} · <button class="link" data-act="change">Quelle wechseln</button></div>
+        <div class="src">${esc(S.source.name)} · ${S.source.kind === 'gallery'
+          ? (S.access === 'limited' ? '<button class="link" data-act="manageLimited">Auswahl ändern</button>' : '<button class="link" data-act="reloadGallery">Neu einlesen</button>')
+          : '<button class="link" data-act="change">Quelle wechseln</button>'}</div>
       </div>
     </div>
     <div class="h2">Sammlungen</div>
@@ -840,8 +904,7 @@ function renderArchive(){
   if (!list.length){
     html += `<div class="empty"><div class="e">🧺</div><b>Das Archiv ist leer</b><p>Alles, was du nach links wischst, landet hier. Erst wenn du das Archiv leerst, wird gelöscht.</p></div>`;
   } else {
-    const real = S.source && S.source.kind === 'dir', demo = S.source && S.source.kind === 'demo';
-    if (real || demo){
+    if (S.source && ['dir', 'demo', 'gallery'].includes(S.source.kind)){
       html += `<button class="btn danger block" data-act="empty" style="margin-bottom:14px">Archiv leeren · ${fmtBytes(bytes)} freigeben</button>`;
     } else {
       html += `<div class="note"><b>Hinweis:</b> Ein Browser darf Fotos aus deiner Galerie nicht selbst löschen. Lade die Liste herunter und lösche die Dateien dort, oder öffne am Computer in Chrome oder Edge einen Fotoordner – dann leert die App das Archiv direkt.</div>
@@ -858,7 +921,7 @@ function renderArchive(){
 function renderFavs(){
   const body = $('#favsBody'), list = favs(), sel = S.sel.favs;
   for (const id of [...sel]) if (!list.some(i => i.id === id)) sel.delete(id);
-  let html = `<div class="vh"><div><h2>Favoriten</h2><p>${plural(list.length, 'Medium', 'Medien')}</p></div>${list.length ? `<button class="btn small ghost" data-act="zipFavs">${ICON.zip}ZIP</button>` : ''}</div>`;
+  let html = `<div class="vh"><div><h2>Favoriten</h2><p>${plural(list.length, 'Medium', 'Medien')}</p></div>${!list.length ? '' : NATIVE ? (PLATFORM === 'android' ? '<button class="btn small ghost" data-act="favToGallery">In Galerie markieren</button>' : '') : `<button class="btn small ghost" data-act="zipFavs">${ICON.zip}ZIP</button>`}</div>`;
   html += list.length ? gridHtml(list, sel)
     : `<div class="empty"><div class="e">⭐</div><b>Noch keine Favoriten</b><p>Tippe beim Sortieren doppelt auf ein Foto oder nutze den Stern.</p></div>`;
   body.innerHTML = html;
@@ -910,7 +973,7 @@ function renderStats(){
     <div class="h2">Einstellungen</div>
     <div class="rowlist">
       <button class="btn block" data-act="theme">Darstellung: ${({light: 'Hell', dark: 'Dunkel'})[document.documentElement.dataset.theme] || 'Automatisch'}</button>
-      ${S.items.length ? `<button class="btn block" data-act="zipKept">${ICON.zip}Behaltene als ZIP laden</button><button class="btn block" data-act="change">Quelle wechseln</button>` : ''}
+      ${!S.items.length ? '' : NATIVE ? '<button class="btn block" data-act="reloadGallery">Galerie neu einlesen</button>' : `<button class="btn block" data-act="zipKept">${ICON.zip}Behaltene als ZIP laden</button><button class="btn block" data-act="change">Quelle wechseln</button>`}
       <button class="btn ghost block" data-act="reset">Fortschritt zurücksetzen</button>
     </div>
     <p class="faint" style="margin-top:16px">Alles wird nur in diesem Browser gespeichert. Fotos werden nicht hochgeladen.</p>`;
@@ -943,21 +1006,41 @@ function closeSwipe(){
   releaseUrls(new Set());
   renderAll();
 }
-function urlFor(it){ let u = SW.urls.get(it.id); if (!u){ u = URL.createObjectURL(it.file); SW.urls.set(it.id, u); } return u; }
-function releaseUrls(keep){ for (const [id, u] of SW.urls) if (!keep.has(id)){ URL.revokeObjectURL(u); SW.urls.delete(id); } }
+function mediaUrl(it){
+  let p = SW.urls.get(it.id);
+  if (!p){
+    p = !it.nid ? Promise.resolve(URL.createObjectURL(it.file))
+      : it.video ? Gallery.video({id: it.nid}).then(r => CAP.convertFileSrc(r.path))
+      : Gallery.image({id: it.nid, max: 2048}).then(r => r.data);
+    p = p.catch(() => null);
+    SW.urls.set(it.id, p);
+  }
+  return p;
+}
+function releaseUrls(keep){
+  for (const [id, p] of SW.urls) if (!keep.has(id)){
+    p.then(u => { if (u && u.startsWith('blob:')) URL.revokeObjectURL(u); });
+    SW.urls.delete(id);
+  }
+}
 function cardEl(it, top){
   const el = document.createElement('div');
   el.className = 'card ' + (top ? 'top' : 'under');
-  const u = urlFor(it), d = S.dec[it.id];
+  const d = S.dec[it.id], poster = TH.cache.get(it.id);
   el.innerHTML = `<div class="media">${it.video
-      ? `<video src="${u}" muted loop playsinline ${top ? 'autoplay' : ''} preload="metadata"></video>`
-      : `<img class="bg" src="${u}" alt="" aria-hidden="true" draggable="false"><img class="ph" src="${u}" alt="${esc(it.name)}" draggable="false">`}</div>
+      ? `<video muted loop playsinline ${top ? 'autoplay' : ''} preload="metadata"${poster ? ` poster="${poster}"` : ''}></video>`
+      : `<img class="bg" alt="" aria-hidden="true" draggable="false"${poster ? ` src="${poster}"` : ''}><img class="ph" alt="${esc(it.name)}" draggable="false"${poster ? ` src="${poster}"` : ''}>`}</div>
     <div class="stamp keep">Behalten</div><div class="stamp arch">Archiv</div><div class="stamp fav">★</div>
     <div class="meta"><b>${d && d.f ? '<span class="fv">★</span> ' : ''}${fmtDate(it.date)}</b><span>${it.video ? 'Video · ' : ''}${fmtBytes(it.size)} · ${esc(it.path)}</span></div>`;
   const m = el.querySelector('.media');
   const fail = () => { m.classList.add('broken'); m.dataset.msg = 'Keine Vorschau für dieses Format möglich.\n' + it.name; };
   const ph = el.querySelector('.ph'); if (ph) ph.onerror = fail;
   const v = el.querySelector('video'); if (v) v.onerror = fail;
+  mediaUrl(it).then(u => {
+    if (!u){ if (!poster) fail(); return; }
+    if (v){ v.src = u; if (top) v.play().catch(() => {}); }
+    else for (const im of el.querySelectorAll('img')) im.src = u;
+  });
   return el;
 }
 function renderDeck(){
@@ -973,7 +1056,7 @@ function renderDeck(){
   deck.append(top);
   bindCard(top, cur);
   releaseUrls(new Set([cur.id, nxt && nxt.id, after && after.id].filter(Boolean)));
-  if (after && !after.video) new Image().src = urlFor(after);
+  if (after && !after.video) mediaUrl(after);
   $('#swUndo').disabled = !SW.hist.length;
 }
 function renderSummary(){
@@ -1099,9 +1182,15 @@ function renderCompare(){
   if (!grp){ closeCompare(); toast('Alle Gruppen durchgesehen ✓'); return; }
   $('#cmpCount').textContent = `${CMP.gi + 1}/${CMP.groups.length}`;
   CMP.state = new Map(grp.map((it, i) => [it.id, i === 0 ? 'keep' : 'archive']));
+  const gi = CMP.gi;
   $('#cmpGrid').innerHTML = grp.map((it, i) => {
-    const u = URL.createObjectURL(it.file); CMP.urls.push(u);
-    return `<button class="cmp${i ? ' arch' : ''}" data-cid="${esc(it.id)}"><img src="${u}" alt=""><span class="tag">${i ? 'Archiv' : 'Behalten'}</span><span class="inf">${fmtBytes(it.size)}${it.w ? ` · ${it.w}×${it.h}` : ''}<br>${new Date(it.date).toLocaleString('de-DE', {dateStyle: 'medium', timeStyle: 'medium'})}</span></button>`;
+    const p = it.nid ? Gallery.image({id: it.nid, max: 1200}).then(r => r.data).catch(() => null) : Promise.resolve(URL.createObjectURL(it.file));
+    p.then(u => {
+      if (!u) return;
+      if (u.startsWith('blob:')){ if (CMP.gi !== gi){ URL.revokeObjectURL(u); return; } CMP.urls.push(u); }
+      const img = $(`.cmp[data-cid="${CSS.escape(it.id)}"] img`); if (img) img.src = u;
+    });
+    return `<button class="cmp${i ? ' arch' : ''}" data-cid="${esc(it.id)}"><img src="${TH.cache.get(it.id) || ''}" alt=""><span class="tag">${i ? 'Archiv' : 'Behalten'}</span><span class="inf">${fmtBytes(it.size)}${it.w ? ` · ${it.w}×${it.h}` : ''}<br>${new Date(it.date).toLocaleString('de-DE', {dateStyle: 'medium', timeStyle: 'medium'})}</span></button>`;
   }).join('');
 }
 function closeCompare(){
@@ -1160,32 +1249,45 @@ async function zipDownload(list, name){
 
 /* ---------- Archiv leeren ---------- */
 async function emptyArchive(){
-  const list = archived(), bytes = sum(list, i => i.size), real = S.source.kind === 'dir';
-  const ok = await confirmDlg(`${plural(list.length, 'Medium', 'Medien')} löschen?`,
-    real ? `Die Dateien werden endgültig aus „${esc(S.source.name)}“ gelöscht. Das lässt sich nicht rückgängig machen.`
-         : 'Beispielmodus: Die Bilder werden nur aus der Sitzung entfernt.',
-    `Löschen · ${fmtBytes(bytes)}`, true);
-  if (!ok) return;
-  busy('Wird gelöscht…', 0, list.length);
-  let freed = 0, cnt = 0, fail = 0;
+  const list = archived(), kind = S.source.kind;
   const gone = new Set();
-  for (const it of list){
-    try {
-      if (real) await it.dir.removeEntry(it.name);
-      freed += it.size; cnt++; gone.add(it.id); delete S.dec[it.id];
-      const u = TH.cache.get(it.id); if (u) URL.revokeObjectURL(u); TH.cache.delete(it.id);
-    } catch (e){ fail++; }
-    busy(null, cnt + fail, list.length);
+  let fail = 0;
+  if (kind === 'gallery'){
+    // Das System fragt selbst nach; ein eigener Dialog davor waere doppelt.
+    busy('Warte auf Bestätigung…');
+    let r = {deleted: []};
+    try { r = await Gallery.delete({ids: list.map(i => i.nid)}); } catch (e){}
+    busy(false);
+    for (const n of r.deleted || []) gone.add('ph:' + n);
+    if (!gone.size){ toast(r.cancelled ? 'Löschen abgebrochen' : 'Nichts gelöscht'); return; }
+    fail = list.length - gone.size;
+  } else {
+    const bytes = sum(list, i => i.size);
+    const ok = await confirmDlg(`${plural(list.length, 'Medium', 'Medien')} löschen?`,
+      kind === 'dir' ? `Die Dateien werden endgültig aus „${esc(S.source.name)}“ gelöscht. Das lässt sich nicht rückgängig machen.`
+           : 'Beispielmodus: Die Bilder werden nur aus der Sitzung entfernt.',
+      `Löschen · ${fmtBytes(bytes)}`, true);
+    if (!ok) return;
+    busy('Wird gelöscht…', 0, list.length);
+    for (const it of list){
+      try { if (kind === 'dir') await it.dir.removeEntry(it.name); gone.add(it.id); } catch (e){ fail++; }
+      busy(null, gone.size + fail, list.length);
+    }
+    busy(false);
+  }
+  const removed = list.filter(i => gone.has(i.id)), freed = sum(removed, i => i.size);
+  for (const it of removed){
+    delete S.dec[it.id]; S.byId.delete(it.id);
+    const u = TH.cache.get(it.id); if (u && u.startsWith('blob:')) URL.revokeObjectURL(u); TH.cache.delete(it.id);
   }
   S.items = S.items.filter(i => !gone.has(i.id));
-  for (const id of gone) S.byId.delete(id);
-  S.stats.freed += freed; S.stats.deleted += cnt;
-  saveNow(); busy(false); renderAll();
-  celebrate(freed, cnt, fail);
+  S.stats.freed += freed; S.stats.deleted += removed.length;
+  saveNow(); renderAll();
+  celebrate(freed, removed.length, fail);
 }
 function celebrate(bytes, cnt, fail){
   const s = document.createElement('div'); s.className = 'scrim';
-  s.innerHTML = `<div class="dlg freed"><div class="e">✨</div><div class="n">0 B</div><p>${plural(cnt, 'Medium', 'Medien')} gelöscht${fail ? ` · ${fail} nicht möglich` : ''}.<br>So viel Platz hast du gerade freigemacht.</p><button class="btn primary block">Super</button></div>`;
+  s.innerHTML = `<div class="dlg freed"><div class="e">✨</div><div class="n">0 B</div><p>${plural(cnt, 'Medium', 'Medien')} gelöscht${fail ? ` · ${fail} nicht möglich` : ''}.<br>So viel Platz hast du gerade freigemacht.${S.source && S.source.kind === 'gallery' ? `<br><small>${PLATFORM === 'ios' ? 'Die Medien liegen noch 30 Tage unter „Zuletzt gelöscht“.' : 'Die Medien liegen noch 30 Tage im Papierkorb der Galerie.'}</small>` : ''}</p><button class="btn primary block">Super</button></div>`;
   document.body.append(s);
   const n = s.querySelector('.n'), t0 = performance.now();
   const tick = now => { const p = Math.min(1, (now - t0) / 1100), e = 1 - Math.pow(1 - p, 3); n.textContent = fmtBytes(Math.round(bytes * e)); if (p < 1) requestAnimationFrame(tick); };
@@ -1237,7 +1339,15 @@ const actions = {
   selAllArch: () => { const l = archived(), s = S.sel.archive; if (s.size === l.length) s.clear(); else l.forEach(i => s.add(i.id)); renderArchive(); },
   restore: () => { for (const id of S.sel.archive) delete S.dec[id]; toast(`${S.sel.archive.size} zurück zu den unsortierten`); S.sel.archive.clear(); saveSoon(); renderAll(); },
   keepSel: () => { for (const id of S.sel.archive) S.dec[id] = {s: 'keep', f: false, t: Date.now()}; S.sel.archive.clear(); saveSoon(); renderAll(); },
-  unfav: () => { for (const id of S.sel.favs) if (S.dec[id]) S.dec[id].f = false; S.sel.favs.clear(); saveSoon(); renderAll(); },
+  unfav: () => { for (const id of S.sel.favs) if (S.dec[id]) S.dec[id].f = false; syncFav([...S.sel.favs].map(id => S.byId.get(id)), false); S.sel.favs.clear(); saveSoon(); renderAll(); },
+  favToGallery: async () => {
+    const ids = favs().filter(i => i.nid).map(i => i.nid);
+    try { const r = await Gallery.setFavorite({ids, value: true}); toast(r && r.ok === false ? 'Nicht übernommen' : 'In der Galerie als Favoriten markiert'); }
+    catch (e){ toast('Nicht übernommen'); }
+  },
+  gallery: () => openGallery(),
+  reloadGallery: () => loadGallery(),
+  manageLimited: async () => { try { await Gallery.manageLimited(); } catch (e){} loadGallery(); },
   zipFavs: () => zipDownload(favs(), 'favoriten.zip'),
   zipKept: () => zipDownload(kept(), 'behalten.zip'),
   theme: () => {
@@ -1319,7 +1429,14 @@ document.addEventListener('drop', e => {
   if (stats) S.stats = Object.assign(S.stats, stats);
   if (dir) S.savedDir = dir;
   renderAll();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (NATIVE){
+    const vp = document.querySelector('meta[name=viewport]');
+    vp.content += ', maximum-scale=1, user-scalable=no';
+    try {
+      const st = (await Gallery.status()).status;
+      if (st === 'granted' || st === 'limited'){ S.access = st; await loadGallery(); }
+    } catch (e){}
+  } else if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
 </body>

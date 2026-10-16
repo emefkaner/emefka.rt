@@ -1,0 +1,68 @@
+name: Native Apps
+
+on:
+  push:
+    paths:
+      - 'ausmisten/**'
+      - 'ausmisten-app/**'
+      - '.github/workflows/native-apps.yml'
+  pull_request:
+    paths:
+      - 'ausmisten/**'
+      - 'ausmisten-app/**'
+      - '.github/workflows/native-apps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    name: iOS (unsignierte IPA)
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ausmisten-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ausmisten-app/package-lock.json
+
+      - name: Abhaengigkeiten
+        run: npm ci
+
+      - name: Web-App in das iOS-Projekt kopieren
+        run: npx cap sync ios
+
+      - name: Xcode-Version
+        run: xcodebuild -version
+
+      - name: Bauen (ohne Signatur)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 200
+
+      - name: IPA packen
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry Ausmisten-unsigniert.ipa Payload
+          ls -la Ausmisten-unsigniert.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ausmisten-iOS-unsigniert
+          path: ausmisten-app/Ausmisten-unsigniert.ipa
+          if-no-files-found: error
