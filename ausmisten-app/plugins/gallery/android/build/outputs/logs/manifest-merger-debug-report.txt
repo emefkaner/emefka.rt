@@ -1,0 +1,40 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:2:1-10:12
+INJECTED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:2:1-10:12
+	package
+		INJECTED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.READ_MEDIA_IMAGES
+ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:4:5-76
+	android:name
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:4:22-73
+uses-permission#android.permission.READ_MEDIA_VIDEO
+ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:5:5-75
+	android:name
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:5:22-72
+uses-permission#android.permission.READ_MEDIA_VISUAL_USER_SELECTED
+ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:6:5-90
+	android:name
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:6:22-87
+uses-permission#android.permission.READ_EXTERNAL_STORAGE
+ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:8:5-107
+	android:maxSdkVersion
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:8:78-104
+	android:name
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:8:22-77
+uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
+ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:9:5-108
+	android:maxSdkVersion
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:9:79-105
+	android:name
+		ADDED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml:9:22-78
+uses-sdk
+INJECTED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml
+INJECTED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/user/emefka.rt/ausmisten-app/plugins/gallery/android/src/main/AndroidManifest.xml
