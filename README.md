@@ -103,3 +103,53 @@ cd ausmisten && python3 -m http.server 8000
 ```
 
 Direkt als Datei geoeffnet funktioniert sie auch, nur ohne Installation.
+
+---
+
+# Ausmisten als native App (iOS und Android)
+
+Der Ordner [`ausmisten-app/`](ausmisten-app/) verpackt dieselbe Web-App mit
+[Capacitor](https://capacitorjs.com) als native App. Der Unterschied zur
+Web-Version: Die App liest direkt die **Fotos-Mediathek** und kann wirklich loeschen.
+
+| | iOS | Android |
+|---|---|---|
+| Medien lesen | PhotoKit, auch „Ausgewaehlte Fotos“ | MediaStore, ab Android 14 auch Teilzugriff |
+| Loeschen | Systemdialog, danach 30 Tage unter „Zuletzt geloescht“ | Systemdialog, danach 30 Tage im Papierkorb (ab Android 11) |
+| Favoriten | wird sofort in der Fotos-App gesetzt | per Knopf „In Galerie markieren“ (das System fragt nach) |
+| Videos | werden abgespielt | werden abgespielt (bis 400 MB) |
+
+Der Zugriff steckt im lokalen Plugin [`ausmisten-app/plugins/gallery`](ausmisten-app/plugins/gallery)
+(Swift und Java). Die Web-App erkennt, dass sie in der App laeuft, und blendet
+dann Dateiauswahl, ZIP-Export und Service Worker aus.
+
+## Testversion bekommen
+
+Jeder Push baut beide Apps auf GitHub Actions (Workflow **Native Apps**).
+Unter *Actions → Native Apps → letzter Lauf → Artifacts* liegen:
+
+* **Ausmisten-Android-Debug** – `app-debug.apk`. Aufs Handy laden, oeffnen,
+  „Installation aus unbekannten Quellen“ erlauben.
+* **Ausmisten-iOS-unsigniert** – `Ausmisten-unsigniert.ipa`. iOS installiert nur
+  signierte Apps. Ohne Entwicklerkonto geht das mit
+  [Sideloadly](https://sideloadly.io) oder [AltStore](https://altstore.io) und
+  einer normalen Apple-ID (Windows oder Mac, iPhone per Kabel). Die Signatur
+  gilt dann 7 Tage. Auf dem iPhone muss der Entwicklermodus an sein
+  (Einstellungen → Datenschutz & Sicherheit).
+
+## Selbst bauen
+
+```
+cd ausmisten-app
+npm install
+npx cap sync
+
+# Android (JDK 21 und Android SDK)
+cd android && ./gradlew assembleDebug
+
+# iOS (Mac mit Xcode 16 oder neuer)
+npx cap open ios   # in Xcode Team waehlen, iPhone anschliessen, Run
+```
+
+Aenderungen an der App selbst gehoeren nach `ausmisten/`; `npx cap sync`
+kopiert sie in beide native Projekte.
