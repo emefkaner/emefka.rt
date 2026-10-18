@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Ausmisten</string>
-    <string name="title_activity_main">Ausmisten</string>
-    <string name="package_name">rt.emefka.ausmisten</string>
-    <string name="custom_url_scheme">rt.emefka.ausmisten</string>
-</resources>

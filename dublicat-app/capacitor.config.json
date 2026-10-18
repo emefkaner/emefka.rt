@@ -1,0 +1,12 @@
+{
+  "appId": "rt.emefka.dublicat",
+  "appName": "DUBLICAT",
+  "webDir": "../dublicat",
+  "backgroundColor": "#f6efe3",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  }
+}

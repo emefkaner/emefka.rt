@@ -3,13 +3,13 @@ name: Native Apps
 on:
   push:
     paths:
-      - 'ausmisten/**'
-      - 'ausmisten-app/**'
+      - 'dublicat/**'
+      - 'dublicat-app/**'
       - '.github/workflows/native-apps.yml'
   pull_request:
     paths:
-      - 'ausmisten/**'
-      - 'ausmisten-app/**'
+      - 'dublicat/**'
+      - 'dublicat-app/**'
       - '.github/workflows/native-apps.yml'
   workflow_dispatch:
 
@@ -22,7 +22,7 @@ jobs:
     runs-on: macos-15
     defaults:
       run:
-        working-directory: ausmisten-app
+        working-directory: dublicat-app
     steps:
       - uses: actions/checkout@v5
 
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ausmisten-app/package-lock.json
+          cache-dependency-path: dublicat-app/package-lock.json
 
       - name: Abhaengigkeiten
         run: npm ci
@@ -58,13 +58,13 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/App.app Payload/
-          zip -qry Ausmisten-unsigniert.ipa Payload
-          ls -la Ausmisten-unsigniert.ipa
+          zip -qry DUBLICAT-unsigniert.ipa Payload
+          ls -la DUBLICAT-unsigniert.ipa
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Ausmisten-iOS-unsigniert
-          path: ausmisten-app/Ausmisten-unsigniert.ipa
+          name: DUBLICAT-iOS-unsigniert
+          path: dublicat-app/DUBLICAT-unsigniert.ipa
           if-no-files-found: error
 
   android:
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ausmisten-app
+        working-directory: dublicat-app
     steps:
       - uses: actions/checkout@v5
 
@@ -80,7 +80,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ausmisten-app/package-lock.json
+          cache-dependency-path: dublicat-app/package-lock.json
 
       - uses: actions/setup-java@v5
         with:
@@ -94,11 +94,11 @@ jobs:
         run: npx cap sync android
 
       - name: Bauen
-        working-directory: ausmisten-app/android
+        working-directory: dublicat-app/android
         run: ./gradlew assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Ausmisten-Android-Debug
-          path: ausmisten-app/android/app/build/outputs/apk/debug/app-debug.apk
+          name: DUBLICAT-Android-Debug
+          path: dublicat-app/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

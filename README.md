@@ -58,9 +58,9 @@ Getestet in Chromium. Benoetigt Canvas 2D, `toBlob` und
 
 ---
 
-# Ausmisten — Fotos per Wischen sortieren
+# DUBLICAT — Fotos per Wischen sortieren
 
-Eine zweite, eigenstaendige Web-App im Ordner [`ausmisten/`](ausmisten/). Sie
+Eine zweite, eigenstaendige Web-App im Ordner [`dublicat/`](dublicat/). Sie
 bildet den Funktionsumfang einer Foto-Aufraeum-App nach und laesst sich als
 App installieren („Zum Home-Bildschirm“). Sie funktioniert auch offline.
 
@@ -99,16 +99,16 @@ Die App braucht einen Webserver, damit Installation und Offline-Betrieb gehen.
 Zum Beispiel GitHub Pages oder lokal:
 
 ```
-cd ausmisten && python3 -m http.server 8000
+cd dublicat && python3 -m http.server 8000
 ```
 
 Direkt als Datei geoeffnet funktioniert sie auch, nur ohne Installation.
 
 ---
 
-# Ausmisten als native App (iOS und Android)
+# DUBLICAT als native App (iOS und Android)
 
-Der Ordner [`ausmisten-app/`](ausmisten-app/) verpackt dieselbe Web-App mit
+Der Ordner [`dublicat-app/`](dublicat-app/) verpackt dieselbe Web-App mit
 [Capacitor](https://capacitorjs.com) als native App. Der Unterschied zur
 Web-Version: Die App liest direkt die **Fotos-Mediathek** und kann wirklich loeschen.
 
@@ -119,7 +119,7 @@ Web-Version: Die App liest direkt die **Fotos-Mediathek** und kann wirklich loes
 | Favoriten | wird sofort in der Fotos-App gesetzt | per Knopf „In Galerie markieren“ (das System fragt nach) |
 | Videos | werden abgespielt | werden abgespielt (bis 400 MB) |
 
-Der Zugriff steckt im lokalen Plugin [`ausmisten-app/plugins/gallery`](ausmisten-app/plugins/gallery)
+Der Zugriff steckt im lokalen Plugin [`dublicat-app/plugins/gallery`](dublicat-app/plugins/gallery)
 (Swift und Java). Die Web-App erkennt, dass sie in der App laeuft, und blendet
 dann Dateiauswahl, ZIP-Export und Service Worker aus.
 
@@ -128,9 +128,9 @@ dann Dateiauswahl, ZIP-Export und Service Worker aus.
 Jeder Push baut beide Apps auf GitHub Actions (Workflow **Native Apps**).
 Unter *Actions → Native Apps → letzter Lauf → Artifacts* liegen:
 
-* **Ausmisten-Android-Debug** – `app-debug.apk`. Aufs Handy laden, oeffnen,
+* **DUBLICAT-Android-Debug** – `app-debug.apk`. Aufs Handy laden, oeffnen,
   „Installation aus unbekannten Quellen“ erlauben.
-* **Ausmisten-iOS-unsigniert** – `Ausmisten-unsigniert.ipa`. iOS installiert nur
+* **DUBLICAT-iOS-unsigniert** – `DUBLICAT-unsigniert.ipa`. iOS installiert nur
   signierte Apps. Ohne Entwicklerkonto geht das mit
   [Sideloadly](https://sideloadly.io) oder [AltStore](https://altstore.io) und
   einer normalen Apple-ID (Windows oder Mac, iPhone per Kabel). Die Signatur
@@ -140,7 +140,7 @@ Unter *Actions → Native Apps → letzter Lauf → Artifacts* liegen:
 ## Selbst bauen
 
 ```
-cd ausmisten-app
+cd dublicat-app
 npm install
 npx cap sync
 
@@ -151,5 +151,5 @@ cd android && ./gradlew assembleDebug
 npx cap open ios   # in Xcode Team waehlen, iPhone anschliessen, Run
 ```
 
-Aenderungen an der App selbst gehoeren nach `ausmisten/`; `npx cap sync`
+Aenderungen an der App selbst gehoeren nach `dublicat/`; `npx cap sync`
 kopiert sie in beide native Projekte.
