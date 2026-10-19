@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seeg mit Kindern</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Familienplan für die Tage im Panorama Allgäu Spa Resort in Seeg: 10 Ausflugsideen mit Kindern, passend zum Wetter.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: schmale Lesespalte; oben Wetterleiste als Tagesplan, darunter 10 Ideen als Liste mit Wetter-Chips */
+:root{
+  --bg:#f3f5f1;
+  --surface:#ffffff;
+  --fg:#1d2a24;
+  --dim:#5b6b63;
+  --line:#d8e0da;
+  --fir:#2f5d46;
+  --lake:#2f6f8f;
+  --hay:#c98a12;
+  --rain:#3f6fa8;
+  --sun-bg:#fbf1d9;
+  --rain-bg:#e3ecf7;
+  --any-bg:#e6efe9;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121815;--surface:#1a221e;--fg:#e4ebe6;--dim:#9aaba2;--line:#2a3530;
+  --fir:#7fbf9b;--lake:#7ab4d2;--hay:#e8b04a;--rain:#8fb3e6;
+  --sun-bg:#2e2716;--rain-bg:#1b2738;--any-bg:#1d2b24;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121815;--surface:#1a221e;--fg:#e4ebe6;--dim:#9aaba2;--line:#2a3530;
+  --fir:#7fbf9b;--lake:#7ab4d2;--hay:#e8b04a;--rain:#8fb3e6;
+  --sun-bg:#2e2716;--rain-bg:#1b2738;--any-bg:#1d2b24;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:17px/1.55 var(--body);margin:0}
+.wrap{max-width:860px;margin:0 auto;padding-block:40px 64px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(2rem,6vw,3.1rem);font-weight:700;color:var(--fir)}
+h2{font-size:1.5rem;font-weight:700;margin-bottom:6px}
+h3{font-size:1.18rem;font-weight:700}
+.eyebrow{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.lede{color:var(--dim);max-width:62ch;margin:12px 0 0}
+section{margin-top:48px}
+.note{color:var(--dim);font-size:.92rem;margin:4px 0 18px;max-width:65ch}
+
+/* Tagesplan */
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.day .d{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.day .d b{font-family:var(--display);font-size:1.05rem}
+.temp{font-variant-numeric:tabular-nums;color:var(--dim);font-size:.9rem;white-space:nowrap}
+.wx{font-size:.88rem;font-weight:600;padding:2px 8px;border-radius:999px;align-self:flex-start}
+.wx.dry{background:var(--sun-bg);color:var(--hay)}
+.wx.wet{background:var(--rain-bg);color:var(--rain)}
+.wx.mix{background:var(--any-bg);color:var(--fir)}
+.day .plan{font-size:.95rem}
+.day .plan a{color:var(--fir);font-weight:600;text-decoration:none}
+.day .plan a:hover{text-decoration:underline}
+
+/* Ideen */
+.ideas{list-style:none;padding:0;margin:0;display:flex;flex-direction:column}
+.idea{display:grid;grid-template-columns:2.4rem minmax(0,1fr);gap:14px;padding:22px 0;border-top:1px solid var(--line);scroll-margin-top:16px}
+.idea:last-child{border-bottom:1px solid var(--line)}
+.num{font-family:var(--display);font-size:1.6rem;font-weight:700;color:var(--lake);line-height:1;font-variant-numeric:tabular-nums}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.88rem;color:var(--dim);margin:6px 0 8px}
+.idea p{margin:0 0 6px;max-width:65ch}
+.tip{font-size:.93rem;color:var(--dim)}
+.tip b{color:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+
+.foot{margin-top:48px;font-size:.88rem;color:var(--dim);max-width:65ch}
+.foot a{color:var(--lake)}
+a:focus-visible{outline:2px solid var(--lake);outline-offset:2px;border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Seeg im Ostallgäu · Panorama Allgäu Spa Resort</div>
+    <h1>Was machen wir heute?</h1>
+    <p class="lede">Ein Plan für die Tage vom 19. bis 26. Oktober mit Kindern. Jeder Tag hat einen Vorschlag, der zur Wettervorhersage passt. Darunter stehen alle 10 Ideen, damit ihr tauschen könnt, wenn das Wetter anders kommt.</p>
+  </header>
+
+  <section aria-labelledby="plan">
+    <h2 id="plan">Tagesplan nach Wetter</h2>
+    <p class="note">Vorhersage für Seeg, Stand Montag 19.10. Ab Mitte der Woche wird sie ungenauer, also morgens kurz nachschauen und notfalls zwei Tage tauschen.</p>
+    <div class="days">
+      <div class="day"><div class="d"><b>Mo 19.</b><span class="temp">8–12 °C</span></div><span class="wx mix">Nebel, trocken</span><div class="plan"><a href="#i1">Schwaltenweiher-Runde</a>, danach Hotelpool</div></div>
+      <div class="day"><div class="d"><b>Di 20.</b><span class="temp">7–16 °C</span></div><span class="wx dry">Trocken, mildester Tag</span><div class="plan"><a href="#i2">Tegelberg: Rodelbahn + Spielplatz</a></div></div>
+      <div class="day"><div class="d"><b>Mi 21.</b><span class="temp">6–11 °C</span></div><span class="wx wet">Regenschauer, ganztags</span><div class="plan"><a href="#i6">Alpspitz-Bade-Center Nesselwang</a></div></div>
+      <div class="day"><div class="d"><b>Do 22.</b><span class="temp">4–10 °C</span></div><span class="wx wet">Regen</span><div class="plan"><a href="#i7">CamboMare Kempten</a> oder <a href="#i8">Hotel-Tag</a></div></div>
+      <div class="day"><div class="d"><b>Fr 23.</b><span class="temp">4–15 °C</span></div><span class="wx dry">Bewölkt, meist trocken</span><div class="plan"><a href="#i3">Alpspitzbahn + Alpspitz-Kick</a></div></div>
+      <div class="day"><div class="d"><b>Sa 24.</b><span class="temp">1–8 °C</span></div><span class="wx mix">Kalt, etwas Regen</span><div class="plan"><a href="#i4">Lechfall + Walderlebniszentrum</a>, dann <a href="#i9">Füssen Altstadt</a></div></div>
+      <div class="day"><div class="d"><b>So 25.</b><span class="temp">1–13 °C</span></div><span class="wx wet">Schauer, 13 mm</span><div class="plan"><a href="#i8">Hotel-Tag</a> mit Spa und Spielen</div></div>
+      <div class="day"><div class="d"><b>Mo 26.</b><span class="temp">3–9 °C</span></div><span class="wx mix">Bewölkt, unsicher</span><div class="plan"><a href="#i5">Hopfensee-Runde</a> oder <a href="#i10">Bergbauernmuseum</a></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ideen">
+    <h2 id="ideen">10 Ideen mit Kindern</h2>
+    <div class="legend"><span class="wx dry">Braucht trockenes Wetter</span><span class="wx mix">Geht auch bei Nebel/Niesel</span><span class="wx wet">Für Regentage</span></div>
+    <p class="note">Fahrzeiten ab Hotel, ungefähr. Ende Oktober läuft bei vielen Bahnen und Museen die Saison aus, deshalb vorher kurz die Öffnungszeiten prüfen.</p>
+    <ol class="ideas">
+      <li class="idea" id="i1"><span class="num">1</span><div>
+        <h3>Rund um den Schwaltenweiher</h3>
+        <div class="meta"><span class="wx mix">Nebel ok</span><span>5 Min. Auto oder zu Fuß</span><span>ca. 1–1,5 Std.</span></div>
+        <p>Flacher Weg um den Weiher direkt bei Seeg, kinderwagentauglich. Bei Nebel ist der See fast mystisch, und Steine werfen geht immer.</p>
+        <p class="tip"><b>Tipp:</b> Gummistiefel einpacken und eine kleine „Schatzsuche" machen: Wer findet das schönste Blatt, die größte Feder, den rundesten Stein?</p>
+      </div></li>
+      <li class="idea" id="i2"><span class="num">2</span><div>
+        <h3>Tegelberg: Sommerrodelbahn und Römerbad</h3>
+        <div class="meta"><span class="wx dry">Nur trocken</span><span>20 Min. nach Schwangau</span><span>halber Tag</span></div>
+        <p>Die Rodelbahn an der Talstation fährt nur bei trockener Bahn, dafür ist sie für Kinder das Highlight. Daneben ein großer Spielplatz und die Ausgrabung eines Römerbads. Der Blick auf Neuschwanstein gibt's gratis dazu.</p>
+        <p class="tip"><b>Tipp:</b> Kleinere Kinder fahren bei einem Erwachsenen mit. Danach Spaziergang am Alpsee bei Hohenschwangau.</p>
+      </div></li>
+      <li class="idea" id="i3"><span class="num">3</span><div>
+        <h3>Alpspitzbahn Nesselwang und Alpspitz-Kick</h3>
+        <div class="meta"><span class="wx dry">Trocken, gute Sicht</span><span>15 Min.</span><span>halber Tag</span></div>
+        <p>Mit der Bahn hoch, oben kurze Spazierwege und Erlebnisstationen, unten die Ganzjahres-Rodelbahn Alpspitz-Kick. Sie fährt auch im Herbst, solange es trocken ist.</p>
+        <p class="tip"><b>Tipp:</b> Nur bei klarer Sicht hochfahren. Bei Nebel lieber nur die Rodelbahn unten.</p>
+      </div></li>
+      <li class="idea" id="i4"><span class="num">4</span><div>
+        <h3>Lechfall und Walderlebniszentrum Ziegelwies</h3>
+        <div class="meta"><span class="wx mix">Auch bei Niesel</span><span>15 Min. nach Füssen</span><span>2–3 Std.</span></div>
+        <p>Der Lechfall rauscht richtig laut, die Steg-Brücke darüber begeistert Kinder. Ein paar Minuten weiter liegt das Walderlebniszentrum mit Ausstellung, Tiergehege und Baumkronenweg. Der Eintritt ist frei.</p>
+        <p class="tip"><b>Tipp:</b> Die Ausstellung im Haus ist ein guter Unterschlupf, wenn ein Schauer kommt.</p>
+      </div></li>
+      <li class="idea" id="i5"><span class="num">5</span><div>
+        <h3>Hopfensee-Runde mit Spielplatz</h3>
+        <div class="meta"><span class="wx dry">Trocken besser</span><span>12 Min.</span><span>1,5–2,5 Std.</span></div>
+        <p>Am Ufer von Hopfen am See gibt es eine Promenade, Spielplätze und Cafés. Die ganze Runde um den See ist etwa 8 km, für Kinder reicht auch ein Stück hin und zurück.</p>
+        <p class="tip"><b>Tipp:</b> Laufrad oder Roller mitnehmen, die Promenade ist flach und asphaltiert.</p>
+      </div></li>
+      <li class="idea" id="i6"><span class="num">6</span><div>
+        <h3>Alpspitz-Bade-Center Nesselwang</h3>
+        <div class="meta"><span class="wx wet">Regentag</span><span>15 Min.</span><span>3–4 Std.</span></div>
+        <p>Hallenbad mit Rutsche, Kinderbecken und Außenbecken. Nah genug, dass sich auch ein kurzer Besuch am Nachmittag lohnt.</p>
+        <p class="tip"><b>Tipp:</b> Vormittags ist es an Regentagen meist ruhiger.</p>
+      </div></li>
+      <li class="idea" id="i7"><span class="num">7</span><div>
+        <h3>CamboMare Kempten</h3>
+        <div class="meta"><span class="wx wet">Regentag</span><span>35 Min.</span><span>halber bis ganzer Tag</span></div>
+        <p>Großes Erlebnisbad mit mehreren Rutschen, Wellenbecken und Kleinkindbereich. Gut für einen kompletten Schlechtwettertag.</p>
+        <p class="tip"><b>Tipp:</b> Danach in Kempten etwas essen und durch die Altstadt bummeln, falls der Regen nachlässt.</p>
+      </div></li>
+      <li class="idea" id="i8"><span class="num">8</span><div>
+        <h3>Hotel-Tag: Pool, Spiele, Basteln</h3>
+        <div class="meta"><span class="wx wet">Regentag</span><span>0 Min.</span><span>so lange ihr wollt</span></div>
+        <p>Das Hotel hat ein beheiztes Hallen- und Außenbecken. Dazwischen Kartenspiele, Malen, Herbstblätter vom Vortag zu Bildern kleben. Ein langsamer Tag hilft gegen Ausflugsmüdigkeit.</p>
+        <p class="tip"><b>Tipp:</b> An der Rezeption nach Familienzeiten im Pool und nach Spielen zum Ausleihen fragen.</p>
+      </div></li>
+      <li class="idea" id="i9"><span class="num">9</span><div>
+        <h3>Füssen Altstadt und Hohes Schloss</h3>
+        <div class="meta"><span class="wx mix">Bei jedem Wetter kurz</span><span>15 Min.</span><span>2–3 Std.</span></div>
+        <p>Kleine Gassen, Brunnen und das Hohe Schloss mit seinem bemalten Innenhof. Die Fassaden sind gemalt und täuschen Fenster und Erker vor, Kinder dürfen raten, was echt ist.</p>
+        <p class="tip"><b>Tipp:</b> Gut mit Idee 4 kombinierbar, beides liegt in Füssen.</p>
+      </div></li>
+      <li class="idea" id="i10"><span class="num">10</span><div>
+        <h3>Allgäuer Bauernhof erleben</h3>
+        <div class="meta"><span class="wx mix">Bewölkt ok</span><span>20–40 Min.</span><span>2–3 Std.</span></div>
+        <p>Schaukäserei oder Bergbauernmuseum (zum Beispiel in Diepolz): Kühe, alte Höfe, Käse probieren. Für Kinder anschaulicher als jedes Museum mit Vitrinen.</p>
+        <p class="tip"><b>Tipp:</b> Das Bergbauernmuseum schließt Ende Oktober oder Anfang November für den Winter, vorher anrufen.</p>
+      </div></li>
+    </ol>
+  </section>
+
+  <p class="foot">Wetterdaten: Vorhersage von <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> für Seeg, abgerufen am 19.10.2026. Öffnungszeiten und Saisonzeiten bitte vor jedem Ausflug selbst prüfen.</p>
+</div>
+</body>
+</html>
