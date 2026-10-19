@@ -55,3 +55,113 @@ fluessig. Geladene Bilder werden auf 3000px lange Kante begrenzt.
 
 Getestet in Chromium. Benoetigt Canvas 2D, `toBlob` und
 `createImageData` — alles seit Jahren ueberall vorhanden.
+
+---
+
+# DUBLICAT — Fotos per Wischen sortieren
+
+Eine zweite, eigenstaendige Web-App im Ordner [`dublicat/`](dublicat/). Sie
+bildet den Funktionsumfang einer Foto-Aufraeum-App nach und laesst sich als
+App installieren („Zum Home-Bildschirm“). Sie funktioniert auch offline.
+
+## Funktionen
+
+| Bereich | Was es kann |
+|---|---|
+| **Wischen** | Links = Archiv, rechts = behalten, Doppeltippen oder Stern = Favorit. Rueckgaengig-Knopf. Tasten `←` `→` `↑` `Z`. Videos laufen stumm, Antippen schaltet den Ton. |
+| **Sammlungen** | Alle unsortierten, Zufaellig, An diesem Tag, Screenshots, Videos, Groesste Dateien, dazu jeder Monat einzeln mit Fortschrittsbalken. |
+| **Aehnliche und Duplikate** | Bild-Fingerabdruck (128-Bit-dHash). Gleiche Bilder werden immer gruppiert, aehnliche nur innerhalb von 30 Minuten (Serienbilder). Nebeneinander vergleichen, die groesste Datei ist vorausgewaehlt. |
+| **Archiv** | Nichts wird sofort geloescht. Zuruecklegen oder behalten per Auswahl, dann mit einem Tipp leeren, mit Anzeige des freigegebenen Speichers. |
+| **Favoriten** | Uebersicht, abwaehlen, als ZIP herunterladen. |
+| **Fortschritt** | Tagesziel (20/50/100/200), Serie und laengste Serie, Kalender der letzten 17 Wochen, Summen, fertige Monate. |
+| **Datum** | Aufnahmedatum aus EXIF, sonst aus dem Dateinamen, sonst das Aenderungsdatum. |
+
+## Loeschen: was ein Browser darf
+
+* **Chrome oder Edge am Computer:** „Fotoordner oeffnen“ gibt der App Schreibrechte
+  auf den Ordner. „Archiv leeren“ loescht die Dateien dann wirklich. Der Ordner
+  wird gemerkt und kann beim naechsten Mal fortgesetzt werden.
+* **iPhone, Android, Firefox, Safari:** Ein Browser darf Dateien in der Galerie
+  nicht loeschen. Die App merkt sich alle Entscheidungen. Das Archiv laesst sich
+  als Dateiliste herunterladen, und die behaltenen Bilder oder Favoriten als ZIP.
+
+Fortschritt und Entscheidungen liegen nur in diesem Browser (IndexedDB). Die
+Fotos selbst werden nirgendwohin hochgeladen.
+
+## Bewusst weggelassen
+
+Tageslimit fuer Wischvorgaenge, Werbung, Abo und Einladungsprogramm. Das sind
+Geschaeftsmodell-Funktionen der Vorlage, keine Funktionen zum Sortieren.
+
+## Starten
+
+Die App braucht einen Webserver, damit Installation und Offline-Betrieb gehen.
+Zum Beispiel GitHub Pages oder lokal:
+
+```
+cd dublicat && python3 -m http.server 8000
+```
+
+Direkt als Datei geoeffnet funktioniert sie auch, nur ohne Installation.
+
+---
+
+# DUBLICAT als native App (iOS und Android)
+
+Der Ordner [`dublicat-app/`](dublicat-app/) verpackt dieselbe Web-App mit
+[Capacitor](https://capacitorjs.com) als native App. Der Unterschied zur
+Web-Version: Die App liest direkt die **Fotos-Mediathek** und kann wirklich loeschen.
+
+| | iOS | Android |
+|---|---|---|
+| Medien lesen | PhotoKit, auch „Ausgewaehlte Fotos“ | MediaStore, ab Android 14 auch Teilzugriff |
+| Loeschen | Systemdialog, danach 30 Tage unter „Zuletzt geloescht“ | Systemdialog, danach 30 Tage im Papierkorb (ab Android 11) |
+| Favoriten | wird sofort in der Fotos-App gesetzt | per Knopf „In Galerie markieren“ (das System fragt nach) |
+| Videos | werden abgespielt | werden abgespielt (bis 400 MB) |
+
+Der Zugriff steckt im lokalen Plugin [`dublicat-app/plugins/gallery`](dublicat-app/plugins/gallery)
+(Swift und Java). Die Web-App erkennt, dass sie in der App laeuft, und blendet
+dann Dateiauswahl, ZIP-Export und Service Worker aus.
+
+## iPhone Duo
+
+DUBLICAT ist fuer das faltbare iPhone Duo angepasst:
+
+* **Zugeklappt** (5,4 Zoll): wie auf jedem iPhone, mit Abstand zur Statusspalte am rechten Rand.
+* **Aufgeklappt** (7,6 Zoll, 951 x 669 pt): zwei Spalten, die Luecke dazwischen liegt genau auf
+  dem Falz. Links Sortieren, rechts Archiv, Favoriten oder Fortschritt. Beim Wischen links die
+  Karte, rechts Details, die naechsten Bilder und die Knoepfe.
+* **Auf- und Zuklappen** wechselt live, auch mitten im Wischen.
+* Gebaut wird mit **Xcode 27.1 / iOS 27.1 SDK**. Mit aelterem SDK liefe die App auf dem Duo nur
+  in einem kleinen Fenster; der Workflow prueft deshalb den SDK-Stempel der App.
+
+## Testversion bekommen
+
+Jeder Push baut beide Apps auf GitHub Actions (Workflow **Native Apps**).
+Unter *Actions → Native Apps → letzter Lauf → Artifacts* liegen:
+
+* **DUBLICAT-Android-Debug** – `app-debug.apk`. Aufs Handy laden, oeffnen,
+  „Installation aus unbekannten Quellen“ erlauben.
+* **DUBLICAT-iOS-unsigniert** – `DUBLICAT-unsigniert.ipa`. iOS installiert nur
+  signierte Apps. Ohne Entwicklerkonto geht das mit
+  [Sideloadly](https://sideloadly.io) oder [AltStore](https://altstore.io) und
+  einer normalen Apple-ID (Windows oder Mac, iPhone per Kabel). Die Signatur
+  gilt dann 7 Tage. Auf dem iPhone muss der Entwicklermodus an sein
+  (Einstellungen → Datenschutz & Sicherheit).
+
+## Selbst bauen
+
+```
+cd dublicat-app
+npm install
+npx cap sync
+
+# Android (JDK 21 und Android SDK)
+cd android && ./gradlew assembleDebug
+
+# iOS (Mac mit Xcode 16 oder neuer)
+npx cap open ios   # in Xcode Team waehlen, iPhone anschliessen, Run
+```
+
+Aenderungen an der App selbst gehoeren nach `dublicat/`; `npx cap sync`
+kopiert sie in beide native Projekte.

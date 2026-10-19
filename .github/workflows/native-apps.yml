@@ -1,0 +1,119 @@
+name: Native Apps
+
+on:
+  push:
+    paths:
+      - 'dublicat/**'
+      - 'dublicat-app/**'
+      - '.github/workflows/native-apps.yml'
+  pull_request:
+    paths:
+      - 'dublicat/**'
+      - 'dublicat-app/**'
+      - '.github/workflows/native-apps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    name: iOS (Xcode 27.1, iPhone Duo)
+    # Xcode 27.1 / iOS 27.1 SDK: nur damit fuellt die App beide Displays des iPhone Duo.
+    runs-on: xcode-27
+    defaults:
+      run:
+        working-directory: dublicat-app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dublicat-app/package-lock.json
+
+      - name: Xcode 27.1 auswaehlen
+        run: |
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_27.1*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$X" ]; then echo "::error::Xcode 27.1 ist auf diesem Runner nicht installiert"; exit 1; fi
+          sudo xcode-select -s "$X"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
+
+      - name: Abhaengigkeiten
+        run: npm ci
+
+      - name: Web-App in das iOS-Projekt kopieren
+        run: npx cap sync ios
+
+      - name: Bauen (ohne Signatur)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 200
+
+      - name: SDK-Stempel pruefen (muss 27.1 oder neuer sein)
+        run: |
+          BIN=build/Build/Products/Release-iphoneos/App.app/App
+          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION
+          SDK=$(otool -l "$BIN" | awk '/LC_BUILD_VERSION/{f=1} f && $1=="sdk"{print $2; exit}')
+          echo "SDK: $SDK"
+          python3 -c "import sys; v=tuple(map(int,'$SDK'.split('.'))); sys.exit(0 if v>=(27,1) else 1)" || { echo "::error::App ist mit SDK $SDK gebaut, das iPhone Duo braucht 27.1"; exit 1; }
+
+      - name: IPA packen
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry DUBLICAT-unsigniert.ipa Payload
+          ls -la DUBLICAT-unsigniert.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DUBLICAT-iOS-unsigniert
+          path: dublicat-app/DUBLICAT-unsigniert.ipa
+          if-no-files-found: error
+
+  android:
+    name: Android (Debug-APK)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dublicat-app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dublicat-app/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Abhaengigkeiten
+        run: npm ci
+
+      - name: Web-App in das Android-Projekt kopieren
+        run: npx cap sync android
+
+      - name: Bauen
+        working-directory: dublicat-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DUBLICAT-Android-Debug
+          path: dublicat-app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

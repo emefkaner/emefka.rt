@@ -1,0 +1,20 @@
+{
+  "name": "dublicat-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native Huelle (Capacitor) fuer die DUBLICAT-Web-App, mit Zugriff auf die Fotogalerie.",
+  "scripts": {
+    "sync": "cap sync",
+    "android:apk": "cap sync android && cd android && ./gradlew assembleDebug",
+    "ios:open": "cap sync ios && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "dublicat-gallery": "file:plugins/gallery"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
