@@ -123,6 +123,18 @@ Der Zugriff steckt im lokalen Plugin [`dublicat-app/plugins/gallery`](dublicat-a
 (Swift und Java). Die Web-App erkennt, dass sie in der App laeuft, und blendet
 dann Dateiauswahl, ZIP-Export und Service Worker aus.
 
+## iPhone Duo
+
+DUBLICAT ist fuer das faltbare iPhone Duo angepasst:
+
+* **Zugeklappt** (5,4 Zoll): wie auf jedem iPhone, mit Abstand zur Statusspalte am rechten Rand.
+* **Aufgeklappt** (7,6 Zoll, 951 x 669 pt): zwei Spalten, die Luecke dazwischen liegt genau auf
+  dem Falz. Links Sortieren, rechts Archiv, Favoriten oder Fortschritt. Beim Wischen links die
+  Karte, rechts Details, die naechsten Bilder und die Knoepfe.
+* **Auf- und Zuklappen** wechselt live, auch mitten im Wischen.
+* Gebaut wird mit **Xcode 27.1 / iOS 27.1 SDK**. Mit aelterem SDK liefe die App auf dem Duo nur
+  in einem kleinen Fenster; der Workflow prueft deshalb den SDK-Stempel der App.
+
 ## Testversion bekommen
 
 Jeder Push baut beide Apps auf GitHub Actions (Workflow **Native Apps**).
